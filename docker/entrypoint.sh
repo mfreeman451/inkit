@@ -24,10 +24,10 @@ Visual Assistant API is starting.
 Open: ${public_url}
 
 Remote Docker host:
-  PHX_HOST=<server-hostname-or-ip> SECRET_KEY_BASE="\$(openssl rand -base64 48)" docker compose up --build
+  PHX_HOST=<server-hostname-or-ip> docker compose up --build
 
 Local-only bind:
-  INKIT_BIND=127.0.0.1 SECRET_KEY_BASE="\$(openssl rand -base64 48)" docker compose up --build
+  INKIT_BIND=127.0.0.1 docker compose up --build
 
 API smoke test from the repo checkout:
   python3 scripts/validate_api.py --base-url ${public_url}
