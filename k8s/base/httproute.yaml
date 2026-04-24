@@ -7,7 +7,9 @@ metadata:
     external-dns.alpha.kubernetes.io/hostname: inkit.carverauto.dev
 spec:
   parentRefs:
-    - name: carverauto-web-gateway
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: carverauto-web-gateway
       sectionName: https-inkit
   hostnames:
     - inkit.carverauto.dev
@@ -17,9 +19,12 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: inkit
+        - group: ""
+          kind: Service
+          name: inkit
           namespace: inkit
           port: 80
+          weight: 1
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -28,7 +33,9 @@ metadata:
   namespace: carverauto-web
 spec:
   parentRefs:
-    - name: carverauto-web-gateway
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: carverauto-web-gateway
       sectionName: http
   hostnames:
     - inkit.carverauto.dev
