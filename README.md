@@ -11,7 +11,7 @@ The intended evaluator path is Docker Compose — nothing else needs to be
 installed locally:
 
 ```bash
-SECRET_KEY_BASE="$(openssl rand -base64 48)" docker compose up --build
+docker compose up --build
 ```
 
 Open `http://localhost:4000`. SQLite data and uploads live in the
@@ -22,11 +22,12 @@ On a remote server, publish on all interfaces and set the external host used by
 Phoenix:
 
 ```bash
-PHX_HOST=your-server.example.com SECRET_KEY_BASE="$(openssl rand -base64 48)" docker compose up --build
+PHX_HOST=your-server.example.com docker compose up --build
 ```
 
 Use `INKIT_BIND=127.0.0.1` only when you intentionally want the Docker port
-bound to localhost.
+bound to localhost. Compose includes a demo `SECRET_KEY_BASE` so evaluator
+commands work without extra setup.
 
 Validate the REST API against a running instance:
 
