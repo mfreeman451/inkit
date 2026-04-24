@@ -1,216 +1,174 @@
-# Senior Software Engineer Interview Scenario: Visual Assistant API
+# Visual Assistant API
 
-This project simulates a multi-stage backend development interview task focused on building a RESTful API with AI integration, streaming, history, and database persistence.
+Phoenix implementation of the Inkit take-home exercise. The app supports image upload, initial mock vision analysis, non-streaming API chat, Phoenix LiveView streaming chat, per-image conversation history, SQLite persistence, API request logs, and a small reviewer-facing UI.
 
-## Setup and Running
+## Quick Start
 
-### Option 1: Using pipenv (Recommended for Unix-based systems)
+The intended evaluator path is Docker Compose — nothing else needs to be
+installed locally:
 
-This project uses `pipenv` for dependency management.
+```bash
+SECRET_KEY_BASE="$(openssl rand -base64 48)" docker compose up --build
+```
 
-1. **Prerequisites:**
-   * Python 3.8+
-   * `pipenv` installed (`pip install pipenv`)
+Open `http://localhost:4000`. SQLite data and uploads live in the
+`inkit_data` Docker volume. The image ships with a demo SQLite database plus
+two sample images (kitchen and bathroom), so the UI has content on first load.
 
-2. **Install Dependencies:**
-   ```bash
-   pipenv install
-   ```
+Validate the REST API against a running instance:
 
-3. **Run the Flask Application:**
-   ```bash
-   pipenv run python app.py
-   ```
-   The API will be available at `http://127.0.0.1:5000`.
+```bash
+python3 scripts/validate_api.py --base-url http://localhost:4000
+```
 
-### Option 2: Using venv (Alternative for Windows)
+### Local development (optional)
 
-If you're on Windows and encounter issues with pipenv, you can use Python's built-in venv:
+For iterating on the Elixir code without Docker:
 
-1. **Prerequisites:**
-   * Python 3.8+
-   * Git Bash or PowerShell (recommended for better command-line experience)
+- Elixir 1.15+ / Erlang/OTP
+- SQLite
+- Node 20+ for Playwright E2E tests
 
-2. **Create and Activate Virtual Environment:**
-   ```bash
-   # Create virtual environment
-   python -m venv venv
+```bash
+mix setup
+mix phx.server
+```
 
-   # Activate virtual environment
-   # In PowerShell:
-   .\venv\Scripts\Activate.ps1
-   # In Git Bash:
-   source venv/Scripts/activate
-   # In Command Prompt:
-   .\venv\Scripts\activate.bat
-   ```
+Open `http://localhost:4000`.
 
-3. **Install Dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+## API
 
-4. **Run the Flask Application:**
-   ```bash
-   python app.py
-   ```
-   The API will be available at `http://127.0.0.1:5000`.
+Upload an image:
 
-### Troubleshooting Windows Setup
+```bash
+curl -s -X POST http://localhost:4000/upload \
+  -F "image=@priv/demo/uploads/kitchen.jpg"
+```
 
-If you encounter any issues with the setup on Windows:
+Ask a non-streaming question:
 
-1. **Python Path Issues:**
-   - Ensure Python is added to your system's PATH
-   - Try using the full path to Python: `C:\Path\To\Python\python.exe -m venv venv`
+```bash
+curl -s -X POST http://localhost:4000/chat/IMAGE_ID \
+  -H "content-type: application/json" \
+  -d '{"question":"What style is this image?"}'
+```
 
-2. **Virtual Environment Activation:**
-   - If activation fails, try running PowerShell as Administrator
-   - For PowerShell, you might need to set the execution policy:
-     ```powershell
-     Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-     ```
+Stream a chat answer with OpenAI-style SSE chunks:
 
-3. **Dependency Installation:**
-   - If pip install fails, try updating pip first:
-     ```bash
-     python -m pip install --upgrade pip
-     ```
-   - For SSL errors, you might need to install certificates:
-     ```bash
-     pip install --upgrade certifi
-     ```
+```bash
+curl -N -X POST http://localhost:4000/chat/IMAGE_ID/stream \
+  -H "content-type: application/json" \
+  -d '{"question":"What do you notice?"}'
+```
 
-4. **Port Issues:**
-   - If port 5000 is in use, you can change it in app.py:
-     ```python
-     app.run(debug=True, threaded=True, port=5001)  # or any other available port
-     ```
+Fetch an uploaded image:
 
-## Interview Questions
+```bash
+curl -s http://localhost:4000/images/IMAGE_ID --output image.jpg
+```
 
-This interview is divided into four parts, progressively building upon the API. You will start with the provided `app.py` template and modify it to meet the requirements of each question.
+Browser chat streams through Phoenix LiveView. The REST API also includes
+`POST /chat/:image_id/stream` for SSE clients that expect OpenAI-style
+`chat.completion.chunk` frames ending with `data: [DONE]`.
 
-## Question 1: Foundational API - Image Upload and Basic Chat
+## Stack
 
-**Context:**
-We want to build the initial version of a "Visual Assistant". Users should be able to upload an image, receive some initial analysis, and then ask questions about that image.
+- Elixir, Phoenix, Phoenix LiveView
+- Ash Framework resources/domains with AshSqlite
+- SQLite through Ecto/AshSqlite
+- Tailwind CSS and daisyUI
+- ETS cache boundary for non-authoritative local caching
+- ETS-backed fixed-window rate limiter (60 req/min per IP per bucket by default)
+- Periodic retention sweep GenServer (default 30-day messages/images, 7-day API logs)
+- SSE chat with `Last-Event-ID` resume on `POST /chat/:id/stream`
+- Credo, ExUnit, and Playwright
+- Docker and GitHub Actions
+- Kustomize and Argo CD manifests are included for Kubernetes deployment, but
+  Docker Compose is the intended evaluator surface
 
-**Requirements:**
-1. Implement a RESTful endpoint for image upload that:
-   - Accepts image files via multipart form
-   - Validates file types and content
-   - Handles concurrent uploads efficiently
-   - Implements proper error handling
-   - Returns appropriate status codes and error messages
-   - Generates unique identifiers for uploaded images
-   - Stores image metadata securely
+## Tests
 
-2. Implement a chat endpoint that:
-   - Accepts questions about uploaded images
-   - Validates input and handles errors appropriately
-   - Returns responses in a format compatible with the mock AI service
-   - Implements proper error handling and status codes
-   - Handles concurrent requests efficiently
+```bash
+mix format --check-formatted
+mix test
+mix credo --strict
+npm ci
+npx playwright install chromium
+npm run test:e2e
+```
 
-3. Implement the mock AI service response structures:
-   - Research and implement the correct response format for `mock_openai_vision_analysis`
-   - Research and implement the correct response format for `mock_openai_chat` (non-streaming)
-   - Ensure response formats match the OpenAI API specifications
-   - Include all required fields in the response (e.g., IDs, timestamps, tokens, etc.)
-   - Handle edge cases in the mock responses
+Playwright runs on port `4003` with its own temporary SQLite database and upload directory, so it does not clear local development data on port `4000`.
 
-## Question 2: Improving User Experience - Streaming Responses
+## Requirement Coverage
 
-**Context:**
-The delay in the chat endpoint can be long. We want to improve this by streaming the response back to the client as it becomes available.
+- Upload endpoint validates supported image content and size.
+- Non-streaming chat endpoint persists user and assistant messages.
+- LiveView chat streams assistant chunks, and the REST API exposes an SSE chat
+  stream compatible with OpenAI Chat Completions chunk framing.
+- Conversations, labels, uploads, usage counters, and API logs are persisted in SQLite.
+- The UI includes conversation selection, upload management, settings cleanup, docs, memory, and activity panels.
+- Docker Compose starts the app without requiring a local Elixir toolchain.
+- CI runs formatting, unit/API tests, Credo, and Playwright E2E tests.
+- The release workflow builds and publishes a Docker image to GHCR for tagged releases.
 
-**Requirements:**
-1. Implement a streaming endpoint that:
-   - Streams responses using Server-Sent Events (SSE)
-   - Handles connection drops and implements reconnection logic
-   - Implements proper backpressure handling
-   - Maintains compatibility with the mock AI service
-   - Handles concurrent streaming connections efficiently
-   - Implements proper error handling and status codes
+## Operational knobs
 
-2. Implement the streaming mock AI service:
-   - Research and implement the correct SSE event format
-   - Implement the streaming version of `mock_openai_chat`
-   - Ensure streaming events match the OpenAI API specifications
-   - Include all required event types (e.g., created, delta, completed)
-   - Handle streaming edge cases and errors
-   - Implement proper event sequencing and timing
+These live under `config :inkit, ...` and can be overridden per environment.
 
-## Question 3: Adding Context - History
+| Key | Default | Purpose |
+| --- | --- | --- |
+| `:rate_limit` `enabled` | `true` | Turn per-IP rate limiting on/off (disabled in `test.exs`). |
+| `:rate_limit` `window_ms` | `60_000` | Fixed window length. |
+| `:rate_limit` `max_requests` | `60` | Per-IP, per-bucket cap per window. Buckets: `:upload`, `:chat`, `:chat_stream`. |
+| `:retention` `enabled` | `true` | Whether the retention GenServer ticks. |
+| `:retention` `messages_days` | `30` | Message rows older than this are purged. |
+| `:retention` `api_logs_days` | `7` | API log rows older than this are purged. |
+| `:retention` `images_days` | `30` | Images (and their messages) older than this are purged. |
+| `:retention` `interval_ms` | `3_600_000` | Sweep interval. |
+| `:async_api_logs` | `true` | Fire-and-forget API log writes via `Task.Supervisor`. |
 
-**Context:**
-Currently, each chat interaction is independent. We want the assistant to remember the conversation history for a specific image.
+Rate-limited responses carry `Retry-After` and `X-RateLimit-Remaining` /
+`X-RateLimit-Reset-Ms` headers.
 
-**Requirements:**
-1. Implement conversation history that:
-   - Stores chat history for each image
-   - Handles concurrent access to history
-   - Implements proper error handling
-   - Maintains data consistency
-   - Handles history for both streaming and non-streaming responses
-   - Implements proper cleanup of old history
+The SSE chat endpoint emits `id: N` before each `data:` frame. On reconnect
+the client can send `Last-Event-ID: K` and the server skips the first `K + 1`
+chunks. Mock completion IDs are derived deterministically from
+`{image_id, prompt, prior_user_turns}` so resumes keep the same `chatcmpl-…`
+ID across attempts.
 
-2. Update mock functions to handle history:
-   - Modify mock functions to consider conversation context
-   - Implement proper history integration in responses
-   - Handle history-related edge cases
-   - Ensure history is properly reflected in both streaming and non-streaming responses
+## Trade-Offs
 
-## Question 4: Production Readiness - Persistent Storage
+**Mock AI.** Responses are deterministic and tuned for the included
+kitchen/bathroom demo images. The `Inkit.VisualAssistant.MockAI` boundary can
+be swapped for a real provider (OpenAI, Anthropic, etc.) without touching the
+persistence, streaming, or rate-limit paths.
 
-**Context:**
-The current in-memory storage is not suitable for production. We need to implement a proper database solution.
+**SQLite + local disk.** Keeps the whole app spin-up to a single
+`docker compose up` with no external services. The data layer is Ash-backed so
+a Postgres move is mostly a resource-layer swap, and image bytes would move
+to object storage (S3/GCS). That work is deferred since the take-home
+evaluator runs a single container.
 
-**Requirements:**
-1. Implement a database solution that:
-   - Uses a production-ready database
-   - Implements proper database migrations
-   - Handles concurrent database access
-   - Implements a caching layer
-   - Maintains data consistency
-   - Implements proper error handling
-   - Handles database connection issues
-   - Implements proper cleanup of old data
+**Horizontal scaling is bounded by the data layer, not the BEAM.** Even if
+you back the Docker volume or the Kubernetes PVC with something like Longhorn
+or Ceph (the manifests target a Longhorn StorageClass in practice), SQLite is
+still a single-writer database and local-disk uploads are pod-local. So the
+Kubernetes manifests intentionally pin `replicas: 1` with
+`strategy: Recreate`. Stateless fan-out requires the Postgres + object
+storage swap above; that’s the line this submission stops at.
 
-2. Update mock functions for production:
-   - Ensure mock functions work with the database layer
-   - Implement proper error handling for database operations
-   - Handle database-related edge cases
-   - Ensure mock responses remain consistent with database state
+**Production monitoring.** Phoenix telemetry events fire, and
+`Phoenix.LiveDashboard` is mounted under `:dev_routes`. There is no
+Prometheus/OTLP exporter wired — a real deployment would add one and put the
+LiveDashboard behind auth.
 
-## Additional Requirements
+**SSE resume.** Duplicate-persistence is possible if a client completes a full
+stream and then reconnects with `Last-Event-ID`. A real provider integration
+would gate persistence with an idempotency key; documented as a mock-mode
+limitation.
 
-Throughout the implementation, consider:
-1. Security:
-   - Implement rate limiting
-   - Validate all inputs
-   - Handle file uploads securely
-   - Implement proper error handling
-   - Protect against common security vulnerabilities
+## AI and Process Disclosure
 
-2. Performance:
-   - Handle concurrent requests efficiently
-   - Implement proper caching
-   - Optimize database queries
-   - Handle large files efficiently
-   - Implement proper resource cleanup
+This project was built with OpenAI Codex using GPT-5.5 at high reasoning effort as a coding assistant. I used OpenSpec for spec-driven development: the Phoenix/Ash implementation was planned in `openspec/changes/add-visual-assistant-phoenix`, validated with OpenSpec, then implemented and tested against that checklist.
 
-3. Reliability:
-   - Handle errors gracefully
-   - Implement proper logging
-   - Handle edge cases
-   - Implement proper monitoring
-   - Handle system failures gracefully
-
-4. Scalability:
-   - Design for horizontal scaling
-   - Implement proper load balancing
-   - Handle increased load gracefully
-   - Implement proper resource management
-   - Design for future growth # inkit
+AI was used to accelerate scaffolding, implementation, test writing, UI iteration, and documentation. I made the architecture and trade-off decisions, reviewed the generated code, ran the verification suite, and adjusted behavior where the implementation did not meet the take-home requirements.

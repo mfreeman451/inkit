@@ -1,0 +1,14 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: inkit-tls
+  namespace: carverauto-web
+spec:
+  secretName: inkit-tls
+  issuerRef:
+    name: carverauto-issuer
+    kind: ClusterIssuer
+  privateKey:
+    rotationPolicy: Always
+  dnsNames:
+    - inkit.carverauto.dev

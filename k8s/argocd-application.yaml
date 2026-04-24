@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: inkit
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/mfreeman451/inkit.git
+    targetRevision: main
+    path: k8s/base
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: inkit
+  ignoreDifferences:
+    - group: ""
+      kind: PersistentVolumeClaim
+      jsonPointers:
+        - /status
+  syncPolicy:
+    automated:
+      allowEmpty: false
+      prune: true
+      selfHeal: true
+    retry:
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+      limit: 5
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+      - PrunePropagationPolicy=foreground
