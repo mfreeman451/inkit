@@ -6,7 +6,17 @@ defmodule Inkit.VisualAssistant.Workflows do
 
   alias Inkit.Cache
   alias Inkit.Repo
-  alias Inkit.VisualAssistant.{ApiLog, FileStorage, Message, MockAI, UploadedImage}
+
+  alias Inkit.VisualAssistant.{
+    ApiLog,
+    FileStorage,
+    Message,
+    MockAI,
+    Retention,
+    RetentionRun,
+    RetentionSetting,
+    UploadedImage
+  }
 
   def create_image_from_upload(path, original_filename, content_type \\ nil) do
     with {:ok, attrs} <- FileStorage.validate_and_store(path, original_filename, content_type),
@@ -254,6 +264,29 @@ defmodule Inkit.VisualAssistant.Workflows do
         :ok
       end
     end)
+  end
+
+  def retention_settings do
+    case RetentionSetting.fetch() do
+      {:ok, setting} -> {:ok, setting}
+      {:error, _} = err -> err
+    end
+  end
+
+  def update_retention_settings(attrs) do
+    RetentionSetting.update(attrs)
+  end
+
+  def list_retention_runs(limit \\ 20) do
+    RetentionRun
+    |> Ash.Query.for_read(:read)
+    |> Ash.Query.sort(started_at: :desc)
+    |> Ash.Query.limit(limit)
+    |> Ash.read()
+  end
+
+  def run_retention_now do
+    Retention.run_now(triggered_by: :manual)
   end
 
   def clear_api_logs do

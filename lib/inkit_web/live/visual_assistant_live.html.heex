@@ -478,35 +478,183 @@
                   <% end %>
                 </div>
               <% :settings -> %>
-                <div class="rounded-md border border-base-300 bg-base-100 p-6">
-                  <h2 class="mb-4 text-lg font-semibold">Settings</h2>
-                  <dl class="grid gap-3 text-sm sm:grid-cols-2">
-                    <dt class="text-base-content/60">Database</dt>
-                    <dd>SQLite via AshSqlite</dd>
-                    <dt class="text-base-content/60">Cache</dt>
-                    <dd>ETS</dd>
-                    <dt class="text-base-content/60">Stored images</dt>
-                    <dd>{length(@recent_images)}</dd>
-                    <dt class="text-base-content/60">Max upload</dt>
-                    <dd>16 MB</dd>
-                    <dt class="text-base-content/60">Theme</dt>
-                    <dd>Light</dd>
-                  </dl>
-                  <div class="mt-6 border-t border-base-300 pt-5">
-                    <h3 class="mb-2 font-semibold">Data management</h3>
-                    <p class="mb-3 text-sm text-base-content/60">
-                      Remove all uploaded files, labels, cached analysis, and saved conversations
-                      from the local SQLite database.
-                    </p>
-                    <button
-                      class="btn btn-outline btn-error"
-                      data-confirm="Clear every uploaded image and conversation?"
-                      disabled={@recent_images == []}
-                      phx-click="clear_all"
-                      type="button"
+                <div class="flex flex-col gap-6">
+                  <div class="rounded-md border border-base-300 bg-base-100 p-6">
+                    <h2 class="mb-4 text-lg font-semibold">Settings</h2>
+                    <dl class="grid gap-3 text-sm sm:grid-cols-2">
+                      <dt class="text-base-content/60">Database</dt>
+                      <dd>SQLite via AshSqlite</dd>
+                      <dt class="text-base-content/60">Cache</dt>
+                      <dd>ETS</dd>
+                      <dt class="text-base-content/60">Stored images</dt>
+                      <dd>{length(@recent_images)}</dd>
+                      <dt class="text-base-content/60">Max upload</dt>
+                      <dd>16 MB</dd>
+                      <dt class="text-base-content/60">Theme</dt>
+                      <dd>Light</dd>
+                    </dl>
+                    <div class="mt-6 border-t border-base-300 pt-5">
+                      <h3 class="mb-2 font-semibold">Data management</h3>
+                      <p class="mb-3 text-sm text-base-content/60">
+                        Remove all uploaded files, labels, cached analysis, and saved conversations
+                        from the local SQLite database.
+                      </p>
+                      <button
+                        class="btn btn-outline btn-error"
+                        data-confirm="Clear every uploaded image and conversation?"
+                        disabled={@recent_images == []}
+                        phx-click="clear_all"
+                        type="button"
+                      >
+                        Clear images and conversations
+                      </button>
+                    </div>
+                  </div>
+
+                  <div
+                    :if={@retention_setting}
+                    id="retention-settings"
+                    class="rounded-md border border-base-300 bg-base-100 p-6"
+                  >
+                    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h2 class="text-lg font-semibold">Retention</h2>
+                        <p class="text-sm text-base-content/60">
+                          Scheduled sweep removes old messages, API logs, and images. Last 10 runs are shown below.
+                        </p>
+                      </div>
+                      <button
+                        class="btn btn-primary"
+                        phx-click="run_retention_now"
+                        type="button"
+                      >
+                        Run now
+                      </button>
+                    </div>
+
+                    <div
+                      :if={@retention_flash}
+                      class={[
+                        "mb-4 rounded-md border px-3 py-2 text-sm",
+                        retention_flash_classes(@retention_flash)
+                      ]}
                     >
-                      Clear images and conversations
-                    </button>
+                      {elem(@retention_flash, 1)}
+                    </div>
+
+                    <form
+                      phx-submit="update_retention_settings"
+                      class="grid gap-4 sm:grid-cols-2"
+                    >
+                      <label class="flex items-center gap-2 text-sm sm:col-span-2">
+                        <input
+                          type="checkbox"
+                          class="toggle toggle-sm"
+                          name="retention[enabled]"
+                          checked={@retention_setting.enabled}
+                        /> Scheduler enabled
+                      </label>
+
+                      <label class="flex flex-col gap-1 text-sm">
+                        <span class="text-base-content/60">Messages retention (days)</span>
+                        <input
+                          class="input input-bordered input-sm"
+                          type="number"
+                          min="1"
+                          max="3650"
+                          name="retention[messages_days]"
+                          value={@retention_setting.messages_days}
+                        />
+                      </label>
+
+                      <label class="flex flex-col gap-1 text-sm">
+                        <span class="text-base-content/60">API logs retention (days)</span>
+                        <input
+                          class="input input-bordered input-sm"
+                          type="number"
+                          min="1"
+                          max="3650"
+                          name="retention[api_logs_days]"
+                          value={@retention_setting.api_logs_days}
+                        />
+                      </label>
+
+                      <label class="flex flex-col gap-1 text-sm">
+                        <span class="text-base-content/60">Images retention (days)</span>
+                        <input
+                          class="input input-bordered input-sm"
+                          type="number"
+                          min="1"
+                          max="3650"
+                          name="retention[images_days]"
+                          value={@retention_setting.images_days}
+                        />
+                      </label>
+
+                      <label class="flex flex-col gap-1 text-sm">
+                        <span class="text-base-content/60">Sweep interval (minutes)</span>
+                        <input
+                          class="input input-bordered input-sm"
+                          type="number"
+                          min="1"
+                          max="1440"
+                          name="retention[interval_minutes]"
+                          value={@retention_setting.interval_minutes}
+                        />
+                      </label>
+
+                      <div class="sm:col-span-2">
+                        <button class="btn btn-outline" type="submit">Save</button>
+                      </div>
+                    </form>
+
+                    <div class="mt-6">
+                      <h3 class="mb-2 font-semibold">Recent runs</h3>
+                      <%= if @retention_runs == [] do %>
+                        <p class="text-sm text-base-content/60">
+                          No sweeps have run yet. Use "Run now" to trigger one.
+                        </p>
+                      <% else %>
+                        <div class="overflow-x-auto rounded-md border border-base-300">
+                          <table class="table table-sm">
+                            <thead>
+                              <tr>
+                                <th>Started</th>
+                                <th>Trigger</th>
+                                <th>Status</th>
+                                <th>Duration</th>
+                                <th>Messages</th>
+                                <th>API logs</th>
+                                <th>Images</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr :for={run <- @retention_runs}>
+                                <td class="font-mono text-xs">
+                                  {Calendar.strftime(run.started_at, "%Y-%m-%d %H:%M:%S")}
+                                </td>
+                                <td>{run.triggered_by}</td>
+                                <td>
+                                  <span class={[
+                                    "badge badge-sm",
+                                    if(run.status == :ok,
+                                      do: "badge-success",
+                                      else: "badge-error"
+                                    )
+                                  ]}>
+                                    {run.status}
+                                  </span>
+                                </td>
+                                <td>{run.duration_ms} ms</td>
+                                <td>{run.messages_deleted}</td>
+                                <td>{run.api_logs_deleted}</td>
+                                <td>{run.images_deleted}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      <% end %>
+                    </div>
                   </div>
                 </div>
               <% :docs -> %>

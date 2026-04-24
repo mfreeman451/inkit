@@ -28,6 +28,8 @@ defmodule InkitWeb.VisualAssistantLive do
       |> assign(:conversation_view, :index)
       |> assign(:active_tab, :details)
       |> assign(:active_section, :conversations)
+      |> assign(:retention_flash, nil)
+      |> assign_retention_state()
       |> allow_upload(:image,
         accept: ~w(.png .jpg .jpeg .gif),
         max_entries: 1,
@@ -213,6 +215,48 @@ defmodule InkitWeb.VisualAssistantLive do
 
       {:error, reason} ->
         {:noreply, assign(socket, :error, human_error(reason))}
+    end
+  end
+
+  def handle_event("update_retention_settings", %{"retention" => params}, socket) do
+    attrs = %{
+      enabled: params["enabled"] in [true, "true", "on"],
+      messages_days: to_positive_integer(params["messages_days"]),
+      api_logs_days: to_positive_integer(params["api_logs_days"]),
+      images_days: to_positive_integer(params["images_days"]),
+      interval_minutes: to_positive_integer(params["interval_minutes"])
+    }
+
+    case VisualAssistant.update_retention_settings(attrs) do
+      {:ok, _setting} ->
+        {:noreply,
+         socket
+         |> assign(:retention_flash, {:ok, "Retention settings saved."})
+         |> assign_retention_state()}
+
+      {:error, _reason} ->
+        {:noreply,
+         assign(socket, :retention_flash, {:error, "Could not save retention settings."})}
+    end
+  end
+
+  def handle_event("run_retention_now", _params, socket) do
+    case VisualAssistant.run_retention_now() do
+      {:ok, run} ->
+        {:noreply,
+         socket
+         |> assign(
+           :retention_flash,
+           {:ok,
+            "Sweep finished in #{run.duration_ms}ms — " <>
+              "removed #{run.messages_deleted} messages, " <>
+              "#{run.api_logs_deleted} api logs, " <>
+              "#{run.images_deleted} images."}
+         )
+         |> assign_retention_state()}
+
+      {:error, _reason} ->
+        {:noreply, assign(socket, :retention_flash, {:error, "Retention sweep failed."})}
     end
   end
 
@@ -462,4 +506,38 @@ defmodule InkitWeb.VisualAssistantLive do
   defp section_atom("api_logs"), do: :api_logs
   defp section_atom("settings"), do: :settings
   defp section_atom("docs"), do: :docs
+
+  defp assign_retention_state(socket) do
+    setting =
+      case VisualAssistant.retention_settings() do
+        {:ok, setting} -> setting
+        {:error, _} -> nil
+      end
+
+    runs =
+      case VisualAssistant.list_retention_runs(10) do
+        {:ok, runs} -> runs
+        {:error, _} -> []
+      end
+
+    socket
+    |> assign(:retention_setting, setting)
+    |> assign(:retention_runs, runs)
+  end
+
+  defp to_positive_integer(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {n, _} when n > 0 -> n
+      _ -> 1
+    end
+  end
+
+  defp to_positive_integer(value) when is_integer(value) and value > 0, do: value
+  defp to_positive_integer(_), do: 1
+
+  defp retention_flash_classes({:ok, _}),
+    do: "border-success/40 bg-success/10 text-success-content"
+
+  defp retention_flash_classes({:error, _}),
+    do: "border-error/40 bg-error/10 text-error-content"
 end

@@ -6,6 +6,7 @@ defmodule Inkit.VisualAssistant.RetentionTest do
   alias Ecto.Adapters.SQL, as: EctoSQL
   alias Inkit.ImageFixture
   alias Inkit.VisualAssistant.{ApiLog, Message, Retention, UploadedImage, Workflows}
+  alias Inkit.VisualAssistant.RetentionSetting
 
   test "purges messages older than the cutoff and keeps fresh ones" do
     upload = ImageFixture.png_upload()
@@ -19,9 +20,11 @@ defmodule Inkit.VisualAssistant.RetentionTest do
     old_message = find_oldest_message(image)
     backdate!("conversation_messages", old_message.id, -10)
 
-    counts = Retention.run_now(messages_days: 5, api_logs_days: 365, images_days: 365)
+    {:ok, run} = Retention.run_now(messages_days: 5, api_logs_days: 365, images_days: 365)
 
-    assert counts.messages >= 1
+    assert run.messages_deleted >= 1
+    assert run.status == :ok
+    assert run.triggered_by == :manual
     refute Enum.member?(ids(Message), old_message.id)
   end
 
@@ -44,9 +47,9 @@ defmodule Inkit.VisualAssistant.RetentionTest do
 
     backdate!("api_logs", old_log.id, -20)
 
-    counts = Retention.run_now(messages_days: 365, api_logs_days: 10, images_days: 365)
+    {:ok, run} = Retention.run_now(messages_days: 365, api_logs_days: 10, images_days: 365)
 
-    assert counts.api_logs >= 1
+    assert run.api_logs_deleted >= 1
     refute Enum.member?(ids(ApiLog), old_log.id)
   end
 
@@ -58,10 +61,31 @@ defmodule Inkit.VisualAssistant.RetentionTest do
 
     backdate!("uploaded_images", image.id, -60)
 
-    counts = Retention.run_now(messages_days: 365, api_logs_days: 365, images_days: 30)
+    {:ok, run} = Retention.run_now(messages_days: 365, api_logs_days: 365, images_days: 30)
 
-    assert counts.images >= 1
+    assert run.images_deleted >= 1
     refute Enum.member?(ids(UploadedImage), image.id)
+  end
+
+  test "records sweeps as RetentionRun rows" do
+    {:ok, _run} = Retention.run_now(messages_days: 365, api_logs_days: 365, images_days: 365)
+
+    {:ok, runs} = Workflows.list_retention_runs(5)
+    assert runs != []
+    assert [latest | _] = runs
+    assert latest.status == :ok
+    assert latest.triggered_by == :manual
+    assert is_integer(latest.duration_ms)
+  end
+
+  test "settings singleton is read + update" do
+    {:ok, original} = RetentionSetting.fetch()
+
+    {:ok, updated} = RetentionSetting.update(%{messages_days: original.messages_days + 1})
+    assert updated.messages_days == original.messages_days + 1
+
+    {:ok, reread} = RetentionSetting.fetch()
+    assert reread.messages_days == updated.messages_days
   end
 
   defp find_oldest_message(image) do
