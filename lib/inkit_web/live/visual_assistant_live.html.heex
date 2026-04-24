@@ -67,6 +67,7 @@
                       else: "text-base-content/70 hover:bg-base-200"
                     )
                   ]}
+                  data-testid={"recent-conversation-#{image.public_id}"}
                   phx-click="load_image"
                   phx-value-image-id={image.public_id}
                   type="button"
@@ -210,6 +211,7 @@
                         <% image = summary.image %>
                         <button
                           class="rounded-md border border-base-300 bg-base-100 p-3 text-left hover:border-neutral"
+                          data-testid={"conversation-card-#{image.public_id}"}
                           phx-click="load_image"
                           phx-value-image-id={image.public_id}
                           type="button"
@@ -310,13 +312,16 @@
                 <div class="chat-header mb-2">
                   {if message.role == "user", do: "You", else: "Visual Assistant"}
                 </div>
-                <div class={[
-                  "chat-bubble max-w-xl whitespace-pre-line",
-                  if(message.role == "user",
-                    do: "chat-bubble-neutral",
-                    else: "bg-base-200 text-base-content"
-                  )
-                ]}>
+                <div
+                  data-testid={"conversation-message-#{message.role}"}
+                  class={[
+                    "chat-bubble max-w-xl whitespace-pre-line",
+                    if(message.role == "user",
+                      do: "chat-bubble-neutral",
+                      else: "bg-base-200 text-base-content"
+                    )
+                  ]}
+                >
                   {message.content}
                 </div>
               </div>

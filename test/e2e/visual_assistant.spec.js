@@ -67,6 +67,7 @@ test("uploads an image, records it as recent, and streams a chat answer", async 
 
   const imagePath = kitchenImagePath();
   const filename = path.basename(imagePath);
+  let kitchenConversationId;
 
   await page.locator("input[type=file]").setInputFiles(imagePath);
   await expect(page.getByTestId("selected-image-preview")).toBeVisible();
@@ -77,6 +78,15 @@ test("uploads an image, records it as recent, and streams a chat answer", async 
   await expect(page.getByText(/mock vision analysis/i)).toBeVisible();
   await expect(page.getByText(/modern farmhouse/i).first()).toBeVisible();
   await expect(page.locator("aside").getByText(filename).first()).toBeVisible();
+
+  kitchenConversationId = await page.evaluate(() => {
+    const image = document
+      .querySelector("#conversation-frame img[src^='/images/']")
+      ?.getAttribute("src");
+
+    return image?.split("/").pop();
+  });
+  expect(kitchenConversationId).toBeTruthy();
 
   await page.getByPlaceholder("Ask about this image...").fill("What do you notice?");
   await page.getByPlaceholder("Ask about this image...").press("Enter");
@@ -120,10 +130,16 @@ test("uploads an image, records it as recent, and streams a chat answer", async 
   await expect(page.getByText("Client kitchen concept").first()).toBeVisible();
   await expect(page.getByText(bathroomFilename).first()).toBeVisible();
 
-  await page.locator("aside").getByRole("button", { name: /Client kitchen concept/ }).click();
+  await page.getByTestId(`recent-conversation-${kitchenConversationId}`).click();
   await expect(page.getByRole("heading", { name: "Client kitchen concept" })).toBeVisible();
-  await expect(page.getByText("What do you notice?").first()).toBeVisible();
-  await expect(page.getByText("What style is this bathroom?")).toHaveCount(0);
+  await expect(
+    page.getByTestId("conversation-message-user").filter({ hasText: "What do you notice?" }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByTestId("conversation-message-user")
+      .filter({ hasText: "What style is this bathroom?" }),
+  ).toHaveCount(0);
 
   await page.locator("nav").getByRole("button", { name: "API Logs" }).click();
   await expectFrameHeading(page, "API Logs");

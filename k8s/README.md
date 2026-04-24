@@ -19,17 +19,19 @@ The release workflow publishes that tag after a GitHub release/tag build.
 - Shared Envoy Gateway: `carverauto-web/carverauto-web-gateway`
 - Shared Gateway LoadBalancer IP: `23.138.124.29`
 - TLS issuer: `carverauto-issuer`
+- TLS secret: `carverauto-web/inkit-tls`
 - Persistent data: `inkit-data` PVC mounted at `/data`
 - SQLite path: `/data/inkit.db`
 - Upload path: `/data/uploads`
 - Runtime secret: `inkit-runtime`, committed as a SealedSecret
 
 The app does not allocate a dedicated MetalLB address. It reuses the existing
-`carverauto-web-gateway` listener and routes `inkit.carverauto.dev` from the
-`carverauto-web` namespace to the `inkit` service through a `ReferenceGrant`.
-The `carverauto-web-tls` certificate is extended to include
-`inkit.carverauto.dev` so the existing HTTPS listener can terminate TLS for the
-new hostname.
+`carverauto-web-gateway` LoadBalancer IP and adds a hostname-specific
+`https-inkit` listener that terminates with a dedicated `inkit-tls` certificate.
+That certificate contains only `inkit.carverauto.dev`; it does not take
+ownership of the existing `carverauto.dev` or `www.carverauto.dev` certificate.
+Traffic routes from the `carverauto-web` namespace to the `inkit` service
+through a `ReferenceGrant`.
 
 ## Argo CD
 

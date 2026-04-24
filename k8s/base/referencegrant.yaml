@@ -1,9 +1,12 @@
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: ReferenceGrant
 metadata:
-  name: allow-carverauto-web-routes
+  name: allow-shared-gateway-route-to-inkit
   namespace: inkit
 spec:
+  # The HTTPRoute is colocated with the shared Gateway in carverauto-web.
+  # Gateway API requires this grant before that route can target the inkit
+  # namespace Service as a backend.
   from:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute

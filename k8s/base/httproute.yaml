@@ -8,7 +8,7 @@ metadata:
 spec:
   parentRefs:
     - name: carverauto-web-gateway
-      sectionName: https
+      sectionName: https-inkit
   hostnames:
     - inkit.carverauto.dev
   rules:

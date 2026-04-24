@@ -8,6 +8,7 @@ resources:
   - deployment.yaml
   - service.yaml
   - edge-certificate.yaml
+  - edge-gateway-listener.yaml
   - httproute.yaml
   - referencegrant.yaml
   - networkpolicy.yaml
