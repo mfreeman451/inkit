@@ -17,6 +17,7 @@ COPY assets assets
 COPY lib lib
 COPY priv priv
 
+RUN mix compile
 RUN mix assets.deploy
 RUN mix release
 
