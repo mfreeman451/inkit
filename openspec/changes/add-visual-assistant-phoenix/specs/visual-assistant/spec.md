@@ -13,6 +13,11 @@ The system SHALL provide documented setup commands that allow an evaluator to in
 - **WHEN** they run the documented Docker Compose command
 - **THEN** the application builds, starts, prints the local URL, and serves the LiveView UI on port 4000
 
+#### Scenario: Evaluator starts with bundled demo data
+- **GIVEN** an evaluator starts the Docker image with a fresh data volume
+- **WHEN** the application starts
+- **THEN** a seeded SQLite database and bundled kitchen and bathroom images are available for immediate UI review
+
 ### Requirement: Image Upload API
 The system SHALL expose a REST-style endpoint that accepts image uploads, validates image content and size, persists image metadata, generates a unique image identifier, and returns initial mock analysis.
 
@@ -25,6 +30,16 @@ The system SHALL expose a REST-style endpoint that accepts image uploads, valida
 - **GIVEN** the API is running
 - **WHEN** a client uploads a missing, oversized, or unsupported file
 - **THEN** the system returns a structured error response with an appropriate 4xx status code
+
+#### Scenario: User uploads a suspicious filename
+- **GIVEN** the API is running
+- **WHEN** a client uploads an image with a path traversal or control-character filename
+- **THEN** the system stores the image under a server-generated path and persists only a safe basename for display
+
+#### Scenario: User uploads disguised content
+- **GIVEN** the API is running
+- **WHEN** a client uploads non-image bytes with an allowed image extension
+- **THEN** the system rejects the upload based on detected content rather than trusting the client filename or content type
 
 ### Requirement: LiveView Streaming Chat
 The system SHALL provide Phoenix LiveView streaming chat for a previously uploaded image, stream mock assistant response chunks through LiveView updates, and persist the completed exchange in the image's history.
@@ -105,6 +120,11 @@ The system SHALL provide browser UI controls for listing saved conversations, se
 - **WHEN** the user opens the conversations view and selects a conversation
 - **THEN** the system shows that conversation's image context, messages, memory, activity, and focused chat input
 
+#### Scenario: User returns from a selected conversation
+- **GIVEN** the user is viewing a saved conversation
+- **WHEN** they click the back control in the conversation header
+- **THEN** the system returns to the conversations list without mixing messages from another active or recently streamed conversation
+
 #### Scenario: User manages uploads
 - **GIVEN** one or more images are stored
 - **WHEN** the user opens the uploads view
@@ -130,6 +150,24 @@ The system SHALL return consistent, structured errors and SHALL avoid exposing i
 - **GIVEN** an unexpected error occurs during request handling
 - **WHEN** the system responds to the client
 - **THEN** the response contains a safe generic error shape and the sensitive details are limited to server-side logs
+
+#### Scenario: Browser renders user-controlled text
+- **GIVEN** uploaded filenames, labels, and prompts may contain HTML-like text
+- **WHEN** the browser renders conversations, labels, or assistant context
+- **THEN** the system escapes user-controlled text and does not render it as executable HTML
+
+#### Scenario: API receives SQLi-shaped identifiers
+- **GIVEN** a client submits an image identifier containing SQL-like characters
+- **WHEN** the system queries persisted data
+- **THEN** the identifier is treated as opaque data and returns either the matching record or a safe not-found response
+
+### Requirement: API Smoke Validation
+The system SHALL provide a dependency-free validation script that exercises the public REST API using bundled kitchen and bathroom sample images.
+
+#### Scenario: Evaluator validates the API manually
+- **GIVEN** the application is running locally
+- **WHEN** an evaluator runs the documented Python validation script
+- **THEN** it verifies upload, image download, non-streaming chat, SSE streaming chat, OpenAI-style response shapes, and persisted history for both sample images
 
 ### Requirement: Elixir Quality Gate
 The system SHALL provide automated formatting, linting, and test commands that can be run locally by an evaluator.

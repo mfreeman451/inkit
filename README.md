@@ -14,7 +14,17 @@ SECRET_KEY_BASE="$(openssl rand -base64 48)" docker compose up --build
 
 The container prints the URL at startup. Open `http://localhost:4000`.
 
-SQLite data and uploads are stored in the `inkit_data` Docker volume.
+SQLite data and new uploads are stored in the `inkit_data` Docker volume.
+
+The image includes a demo SQLite database and two sample images. On a fresh
+Docker volume, the app starts with kitchen and bathroom conversations already
+loaded so reviewers can click through the UI immediately.
+
+Validate the REST API from the repo root:
+
+```bash
+python3 scripts/validate_api.py --base-url http://localhost:4000
+```
 
 ### Local
 
@@ -38,7 +48,7 @@ Upload an image:
 
 ```bash
 curl -s -X POST http://localhost:4000/upload \
-  -F "image=@tmp/kitchen.jpg"
+  -F "image=@priv/demo/uploads/kitchen.jpg"
 ```
 
 Ask a non-streaming question:

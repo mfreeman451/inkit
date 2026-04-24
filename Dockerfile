@@ -30,6 +30,7 @@ RUN addgroup -S inkit && adduser -S inkit -G inkit
 
 COPY --from=build --chown=inkit:inkit /app/_build/prod/rel/inkit ./
 COPY --chown=inkit:inkit docker/entrypoint.sh ./bin/docker-entrypoint
+COPY --chown=inkit:inkit priv/demo ./demo
 
 RUN chmod +x ./bin/docker-entrypoint
 

@@ -126,6 +126,15 @@ defmodule InkitWeb.VisualAssistantLive do
 
   def handle_event("set_section", _params, socket), do: {:noreply, socket}
 
+  def handle_event("show_conversation_index", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:active_section, :conversations)
+     |> assign(:conversation_view, :index)
+     |> assign(:error, nil)
+     |> refresh_dashboard_data()}
+  end
+
   def handle_event("api_logs_page", %{"direction" => direction}, socket)
       when direction in ["previous", "next"] do
     page =
@@ -233,7 +242,15 @@ defmodule InkitWeb.VisualAssistantLive do
   end
 
   @impl true
-  def handle_info({:stream_chat, stream, [chunk | rest]}, socket) do
+  def handle_info({:stream_chat, stream, chunks}, socket) do
+    if active_stream?(socket, stream) do
+      handle_active_stream(stream, chunks, socket)
+    else
+      {:noreply, socket}
+    end
+  end
+
+  defp handle_active_stream(stream, [chunk | rest], socket) do
     content =
       chunk
       |> get_in(["choices", Access.at(0), "delta", "content"])
@@ -246,7 +263,7 @@ defmodule InkitWeb.VisualAssistantLive do
     {:noreply, update(socket, :streamed_response, &(&1 <> content))}
   end
 
-  def handle_info({:stream_chat, stream, []}, socket) do
+  defp handle_active_stream(stream, [], socket) do
     case VisualAssistant.persist_stream(stream) do
       :ok ->
         VisualAssistant.record_api_log(%{
@@ -276,6 +293,14 @@ defmodule InkitWeb.VisualAssistantLive do
          |> assign(:error, human_error(reason))}
     end
   end
+
+  defp active_stream?(
+         %{assigns: %{streaming: true, image: %{public_id: public_id}}},
+         %{image: %{public_id: public_id}}
+       ),
+       do: true
+
+  defp active_stream?(_socket, _stream), do: false
 
   defp human_error(:empty_prompt), do: "Ask a question before sending."
 

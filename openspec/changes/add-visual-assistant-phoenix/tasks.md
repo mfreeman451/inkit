@@ -4,6 +4,7 @@
 - [x] 1.3 Add `mix setup` support for dependency installation, database setup, and asset setup.
 - [x] 1.4 Add Ash, AshSqlite, and Credo dependencies.
 - [x] 1.5 Add Dockerfile and Docker Compose support for evaluator setup without local Elixir.
+- [x] 1.6 Add bundled demo images and a seeded SQLite database for fresh Docker starts.
 
 ## 2. Persistence and Domain Model
 - [x] 2.1 Add Ash resource and AshSqlite migration for uploaded image metadata.
@@ -42,3 +43,5 @@
 - [x] 7.5 Add Credo lint command and verify strict linting passes.
 - [x] 7.6 Add Playwright E2E tests for upload preview, chat, saved conversations, tabs, API logs, settings cleanup, and mobile behavior.
 - [x] 7.7 Add GitHub Actions CI and GHCR release workflows.
+- [x] 7.8 Add a dependency-free Python API smoke script using the bundled kitchen and bathroom images.
+- [x] 7.9 Add security regression tests for upload traversal, image content validation, XSS escaping, SQLi-shaped IDs, and defensive headers.

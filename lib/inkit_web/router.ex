@@ -12,6 +12,7 @@ defmodule InkitWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json", "multipart"]
+    plug :put_secure_browser_headers
     plug InkitWeb.Plugs.ApiLogPlug
   end
 

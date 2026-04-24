@@ -15,12 +15,13 @@ defmodule Inkit.VisualAssistant.FileStorage do
     with {:ok, stat} <- File.stat(path),
          :ok <- validate_size(stat.size),
          {:ok, detected_type} <- detect_content_type(path),
-         :ok <- validate_extension(original_filename, detected_type),
+         filename <- safe_original_filename(original_filename),
+         :ok <- validate_extension(filename, detected_type),
          {:ok, sha256} <- sha256(path),
          {:ok, storage_path} <- copy_upload(path, detected_type) do
       {:ok,
        %{
-         original_filename: Path.basename(original_filename || "upload"),
+         original_filename: filename,
          content_type: detected_type || claimed_content_type,
          size: stat.size,
          storage_path: storage_path,
@@ -57,6 +58,28 @@ defmodule Inkit.VisualAssistant.FileStorage do
       :ok
     else
       {:error, :unsupported_media_type}
+    end
+  end
+
+  defp safe_original_filename(filename) do
+    filename
+    |> to_string()
+    |> Path.basename()
+    |> String.replace(~r/[\x00-\x1F\x7F]/u, "")
+    |> String.trim()
+    |> truncate_filename()
+  end
+
+  defp truncate_filename(""), do: "upload"
+
+  defp truncate_filename(basename) do
+    if String.length(basename) <= 120 do
+      basename
+    else
+      ext = Path.extname(basename)
+      root = basename |> String.trim_trailing(ext) |> String.slice(0, 120 - String.length(ext))
+
+      root <> ext
     end
   end
 

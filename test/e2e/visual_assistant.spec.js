@@ -3,6 +3,12 @@ const fs = require("fs");
 const path = require("path");
 
 function kitchenImagePath() {
+  const demo = path.resolve("priv/demo/uploads/kitchen.jpg");
+
+  if (fs.existsSync(demo)) {
+    return demo;
+  }
+
   const provided = path.resolve("tmp/kitchen.jpg");
 
   if (fs.existsSync(provided)) {
@@ -20,6 +26,12 @@ function kitchenImagePath() {
 }
 
 function bathroomImagePath() {
+  const demo = path.resolve("priv/demo/uploads/bathroom.jpg");
+
+  if (fs.existsSync(demo)) {
+    return demo;
+  }
+
   const provided = path.resolve("tmp/bathroom.jpg");
 
   if (fs.existsSync(provided)) {
@@ -118,6 +130,11 @@ test("uploads an image, records it as recent, and streams a chat answer", async 
   await expect(page.getByText("Client kitchen concept").first()).toBeVisible();
   await expect(page.getByText(bathroomFilename).first()).toBeVisible();
 
+  await page.getByTestId(`recent-conversation-${kitchenConversationId}`).click();
+  await expect(page.getByRole("heading", { name: "Client kitchen concept" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Back to conversations" })).toBeVisible();
+  await page.getByRole("button", { name: "Back to conversations" }).click();
+  await expectFrameHeading(page, "Conversations");
   await page.getByTestId(`recent-conversation-${kitchenConversationId}`).click();
   await expect(page.getByRole("heading", { name: "Client kitchen concept" })).toBeVisible();
   await expect(

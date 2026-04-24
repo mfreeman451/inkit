@@ -36,10 +36,13 @@ inkit-*.tar
 npm-debug.log
 /assets/node_modules/
 /node_modules/
+__pycache__/
+*.py[cod]
 
 # Database files
 *.db
 *.db-*
+!/priv/demo/inkit_demo.db
 
 # Uploaded images
 /priv/uploads/
