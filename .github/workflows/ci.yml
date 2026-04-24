@@ -60,3 +60,5 @@ jobs:
       - name: Run E2E tests
         run: npm run test:e2e
 
+      - name: Build Docker image
+        run: docker build -t inkit:${{ github.sha }} .
