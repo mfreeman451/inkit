@@ -3,6 +3,9 @@ kind: Application
 metadata:
   name: inkit
   namespace: argocd
+  annotations:
+    argocd-image-updater.argoproj.io/image-list: app=ghcr.io/mfreeman451/inkit:latest
+    argocd-image-updater.argoproj.io/app.update-strategy: digest
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
