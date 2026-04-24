@@ -21,7 +21,7 @@ RUN mix compile
 RUN mix assets.deploy
 RUN mix release
 
-FROM alpine:3.21 AS app
+FROM alpine:3.22 AS app
 
 RUN apk add --no-cache ca-certificates libgcc libstdc++ ncurses-libs openssl sqlite-libs
 
