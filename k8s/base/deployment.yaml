@@ -18,8 +18,10 @@ spec:
         app.kubernetes.io/name: inkit
     spec:
       securityContext:
-        fsGroup: 1000
+        fsGroup: 101
         runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 101
         seccompProfile:
           type: RuntimeDefault
       containers:
