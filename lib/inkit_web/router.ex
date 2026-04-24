@@ -16,6 +16,18 @@ defmodule InkitWeb.Router do
     plug InkitWeb.Plugs.ApiLogPlug
   end
 
+  pipeline :rate_limit_upload do
+    plug InkitWeb.Plugs.RateLimit, bucket: :upload
+  end
+
+  pipeline :rate_limit_chat do
+    plug InkitWeb.Plugs.RateLimit, bucket: :chat
+  end
+
+  pipeline :rate_limit_chat_stream do
+    plug InkitWeb.Plugs.RateLimit, bucket: :chat_stream
+  end
+
   scope "/", InkitWeb do
     pipe_through :browser
 
@@ -29,10 +41,17 @@ defmodule InkitWeb.Router do
   end
 
   scope "/", InkitWeb do
-    pipe_through :api
-
+    pipe_through [:api, :rate_limit_upload]
     post "/upload", VisualAssistantController, :upload
+  end
+
+  scope "/", InkitWeb do
+    pipe_through [:api, :rate_limit_chat]
     post "/chat/:image_id", VisualAssistantController, :chat
+  end
+
+  scope "/", InkitWeb do
+    pipe_through [:api, :rate_limit_chat_stream]
     post "/chat/:image_id/stream", VisualAssistantController, :stream_chat
   end
 

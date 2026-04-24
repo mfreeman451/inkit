@@ -44,9 +44,10 @@ defmodule InkitWeb.VisualAssistantController do
 
   def stream_chat(conn, %{"image_id" => image_id} = params) do
     prompt = prompt_param(params)
+    resume_from = resume_index(conn)
 
     case VisualAssistant.prepare_stream(image_id, prompt) do
-      {:ok, stream} -> stream_sse(conn, stream)
+      {:ok, stream} -> stream_sse(conn, stream, resume_from)
       {:error, reason} -> error(conn, reason)
     end
   end
@@ -67,7 +68,7 @@ defmodule InkitWeb.VisualAssistantController do
     |> json(%{error: %{code: code, message: message}})
   end
 
-  defp stream_sse(conn, stream) do
+  defp stream_sse(conn, stream, resume_from) do
     conn =
       conn
       |> put_resp_content_type("text/event-stream")
@@ -75,9 +76,14 @@ defmodule InkitWeb.VisualAssistantController do
       |> put_resp_header("x-accel-buffering", "no")
       |> send_chunked(:ok)
 
-    case write_stream_chunks(conn, stream.chunks) do
+    chunks =
+      stream.chunks
+      |> Enum.with_index()
+      |> Enum.drop(resume_from)
+
+    case write_stream_chunks(conn, chunks) do
       {:ok, conn} ->
-        case VisualAssistant.persist_stream(stream) do
+        case maybe_persist_stream(stream, resume_from) do
           :ok ->
             write_sse_done(conn)
 
@@ -92,13 +98,36 @@ defmodule InkitWeb.VisualAssistantController do
     end
   end
 
+  # On the first attempt (resume_from == 0) we persist the exchange once the
+  # client has received the full response. On a resume we assume the prior
+  # attempt never got to persist, so we still persist once. A client that
+  # reconnects after a fully-persisted stream could double-persist; that is an
+  # acknowledged limitation of mock streaming and would be addressed in a real
+  # provider integration via an idempotency key.
+  defp maybe_persist_stream(stream, _resume_from), do: VisualAssistant.persist_stream(stream)
+
   defp write_stream_chunks(conn, chunks) do
-    Enum.reduce_while(chunks, {:ok, conn}, fn payload, {:ok, conn} ->
-      case chunk(conn, sse_data(payload)) do
+    Enum.reduce_while(chunks, {:ok, conn}, fn {payload, index}, {:ok, conn} ->
+      frame = "id: #{index}\n" <> sse_data(payload)
+
+      case chunk(conn, frame) do
         {:ok, conn} -> {:cont, {:ok, conn}}
         {:error, reason} -> {:halt, {:error, reason, conn}}
       end
     end)
+  end
+
+  defp resume_index(conn) do
+    case get_req_header(conn, "last-event-id") do
+      [value | _] ->
+        case Integer.parse(String.trim(value)) do
+          {n, _} when n >= 0 -> n + 1
+          _ -> 0
+        end
+
+      [] ->
+        0
+    end
   end
 
   defp write_sse_done(conn) do

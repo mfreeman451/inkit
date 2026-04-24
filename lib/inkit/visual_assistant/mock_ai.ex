@@ -12,18 +12,19 @@ defmodule Inkit.VisualAssistant.MockAI do
 
     chat_completion(@vision_model, content,
       prompt_tokens: 128,
-      completion_tokens: token_count(content)
+      completion_tokens: token_count(content),
+      seed: {image.id, :vision}
     )
   end
 
   def chat(%UploadedImage{} = image, prompt, history) do
     prior_user_messages = Enum.count(history, &(&1.role == "user"))
-
-    content = mock_chat_answer(image, prompt, prior_user_messages)
+    content = mock_chat_answer(image, prompt, history)
 
     chat_completion(@model, content,
       prompt_tokens: token_count(prompt) + token_count(history),
-      completion_tokens: token_count(content)
+      completion_tokens: token_count(content),
+      seed: {image.id, prompt, prior_user_messages}
     )
   end
 
@@ -140,10 +141,11 @@ defmodule Inkit.VisualAssistant.MockAI do
     |> String.trim()
   end
 
-  defp mock_chat_answer(image, prompt, prior_user_messages) do
+  defp mock_chat_answer(image, prompt, history) do
     prompt = String.trim(prompt)
     normalized = String.downcase(prompt)
-    memory_note = memory_note(prior_user_messages)
+    prior_user_messages = Enum.count(history, &(&1.role == "user"))
+    memory_note = memory_note(prior_user_messages, last_user_message(history))
 
     answer =
       cond do
@@ -155,6 +157,16 @@ defmodule Inkit.VisualAssistant.MockAI do
     [String.trim(answer), memory_note]
     |> Enum.reject(&(&1 == ""))
     |> Enum.join("\n\n")
+  end
+
+  defp last_user_message(history) do
+    history
+    |> Enum.reverse()
+    |> Enum.find(&(&1.role == "user"))
+    |> case do
+      nil -> nil
+      message -> message.content
+    end
   end
 
   defp kitchen_chat_answer(normalized) do
@@ -227,18 +239,27 @@ defmodule Inkit.VisualAssistant.MockAI do
     |> String.contains?(["bathroom", "bath", "shower", "tub", "vanity"])
   end
 
-  defp memory_note(0), do: ""
+  defp memory_note(0, _last), do: ""
 
-  defp memory_note(count) do
+  defp memory_note(count, nil) do
     "I also have #{count} prior user turn#{plural(count)} saved for this image, so follow-up questions can build on the conversation instead of starting over."
+  end
+
+  defp memory_note(count, last_user_message) do
+    snippet = last_user_message |> String.trim() |> String.slice(0, 160)
+
+    "Building on our previous exchange — you last asked: \"#{snippet}\". " <>
+      "I have #{count} prior user turn#{plural(count)} saved for this image, " <>
+      "so this follow-up stays grounded in that history."
   end
 
   defp chat_completion(model, content, usage) do
     prompt_tokens = Keyword.fetch!(usage, :prompt_tokens)
     completion_tokens = Keyword.fetch!(usage, :completion_tokens)
+    seed = Keyword.fetch!(usage, :seed)
 
     %{
-      "id" => "chatcmpl-#{unique_id()}",
+      "id" => "chatcmpl-#{stable_id(seed)}",
       "object" => "chat.completion",
       "created" => System.system_time(:second),
       "model" => model,
@@ -299,7 +320,11 @@ defmodule Inkit.VisualAssistant.MockAI do
   defp plural(1), do: ""
   defp plural(_), do: "s"
 
-  defp unique_id do
-    12 |> :crypto.strong_rand_bytes() |> Base.url_encode64(padding: false)
+  defp stable_id(seed) do
+    seed
+    |> :erlang.term_to_binary()
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.url_encode64(padding: false)
+    |> binary_part(0, 22)
   end
 end

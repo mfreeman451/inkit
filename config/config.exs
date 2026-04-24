@@ -12,6 +12,18 @@ config :inkit,
   ecto_repos: [Inkit.Repo],
   generators: [timestamp_type: :utc_datetime]
 
+config :inkit, :rate_limit,
+  enabled: true,
+  window_ms: 60_000,
+  max_requests: 60
+
+config :inkit, :retention,
+  enabled: true,
+  messages_days: 30,
+  api_logs_days: 7,
+  images_days: 30,
+  interval_ms: :timer.hours(1)
+
 # Configures the endpoint
 config :inkit, InkitWeb.Endpoint,
   url: [host: "localhost"],

@@ -13,6 +13,13 @@ config :inkit, Inkit.Repo,
 config :inkit, :upload_dir, Path.expand("../tmp/test_uploads", __DIR__)
 config :inkit, :async_api_logs, false
 
+# Rate limiting is disabled by default in tests so it doesn't interfere with
+# existing controller tests; individual tests opt in via Application.put_env/3.
+config :inkit, :rate_limit, enabled: false, window_ms: 60_000, max_requests: 60
+
+# Retention runs on-demand in tests, not on a timer.
+config :inkit, :retention, enabled: false, interval_ms: :timer.hours(1)
+
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
 config :inkit, InkitWeb.Endpoint,

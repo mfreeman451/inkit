@@ -171,6 +171,102 @@ defmodule InkitWeb.VisualAssistantControllerTest do
     assert %{"error" => %{"code" => "empty_prompt"}} = json_response(conn, 400)
   end
 
+  test "SSE stream tags chunks with ascending `id:` lines", %{conn: conn} do
+    image_id =
+      conn
+      |> post(~p"/upload", %{"image" => ImageFixture.png_upload("kitchen.png")})
+      |> json_response(201)
+      |> get_in(["image", "id"])
+
+    conn =
+      conn
+      |> recycle()
+      |> put_req_header("content-type", "application/json")
+      |> post(~p"/chat/#{image_id}/stream", Jason.encode!(%{question: "What do you notice?"}))
+
+    response = response(conn, 200)
+    ids = parse_sse_ids(response)
+
+    assert ids != []
+    assert ids == Enum.to_list(0..(length(ids) - 1))
+  end
+
+  test "Last-Event-ID resumes the stream past the acknowledged index", %{conn: conn} do
+    image_id =
+      conn
+      |> post(~p"/upload", %{"image" => ImageFixture.png_upload("kitchen.png")})
+      |> json_response(201)
+      |> get_in(["image", "id"])
+
+    resume_from = 2
+
+    resumed =
+      conn
+      |> recycle()
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("last-event-id", Integer.to_string(resume_from))
+      |> post(~p"/chat/#{image_id}/stream", Jason.encode!(%{question: "What do you notice?"}))
+      |> response(200)
+
+    resumed_ids = parse_sse_ids(resumed)
+
+    assert resumed_ids != []
+    assert List.first(resumed_ids) == resume_from + 1
+
+    # ids should be a strictly ascending, contiguous integer sequence.
+    assert resumed_ids ==
+             Enum.to_list(List.first(resumed_ids)..List.last(resumed_ids))
+
+    # Early chunks should never appear in a resumed stream.
+    refute Enum.any?(resumed_ids, fn id -> id <= resume_from end)
+  end
+
+  test "rate limiter returns 429 after exceeding configured max", %{conn: conn} do
+    prior = Application.get_env(:inkit, :rate_limit)
+
+    Application.put_env(:inkit, :rate_limit,
+      enabled: true,
+      window_ms: 60_000,
+      max_requests: 2
+    )
+
+    Inkit.RateLimiter.reset()
+
+    on_exit(fn ->
+      Application.put_env(:inkit, :rate_limit, prior)
+      Inkit.RateLimiter.reset()
+    end)
+
+    conn
+    |> post(~p"/upload", %{"image" => ImageFixture.png_upload()})
+    |> response(201)
+
+    conn
+    |> recycle()
+    |> post(~p"/upload", %{"image" => ImageFixture.png_upload()})
+    |> response(201)
+
+    over =
+      conn
+      |> recycle()
+      |> post(~p"/upload", %{"image" => ImageFixture.png_upload()})
+
+    assert %{"error" => %{"code" => "rate_limited"}} = json_response(over, 429)
+    assert get_resp_header(over, "retry-after") != []
+  end
+
+  defp parse_sse_ids(response) do
+    response
+    |> String.split("\n\n", trim: true)
+    |> Enum.flat_map(fn frame ->
+      frame
+      |> String.split("\n")
+      |> Enum.filter(&String.starts_with?(&1, "id: "))
+      |> Enum.map(&String.replace_prefix(&1, "id: ", ""))
+      |> Enum.map(&String.to_integer/1)
+    end)
+  end
+
   defp parse_sse_data_events(response) do
     response
     |> String.split("\n\n", trim: true)

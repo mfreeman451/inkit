@@ -11,6 +11,8 @@ defmodule Inkit.Application do
       InkitWeb.Telemetry,
       Inkit.Repo,
       Inkit.Cache,
+      Inkit.RateLimiter,
+      Inkit.VisualAssistant.Retention,
       {Task.Supervisor, name: Inkit.TaskSupervisor},
       {Ecto.Migrator,
        repos: Application.fetch_env!(:inkit, :ecto_repos), skip: skip_migrations()},
