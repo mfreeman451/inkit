@@ -1,0 +1,44 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: inkit
+  namespace: carverauto-web
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: inkit.carverauto.dev
+spec:
+  parentRefs:
+    - name: carverauto-web-gateway
+      sectionName: https
+  hostnames:
+    - inkit.carverauto.dev
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: inkit
+          namespace: inkit
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: inkit-http-redirect
+  namespace: carverauto-web
+spec:
+  parentRefs:
+    - name: carverauto-web-gateway
+      sectionName: http
+  hostnames:
+    - inkit.carverauto.dev
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301

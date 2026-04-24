@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inkit
+  namespace: inkit
+  labels:
+    app.kubernetes.io/name: inkit
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: inkit
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: inkit
+    spec:
+      securityContext:
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: inkit
+          image: ghcr.io/mfreeman451/inkit:latest
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - name: http
+              containerPort: 4000
+          env:
+            - name: PHX_SERVER
+              value: "true"
+            - name: PHX_HOST
+              value: inkit.carverauto.dev
+            - name: PHX_SCHEME
+              value: https
+            - name: PHX_URL_PORT
+              value: "443"
+            - name: PORT
+              value: "4000"
+            - name: DATABASE_PATH
+              value: /data/inkit.db
+            - name: UPLOAD_DIR
+              value: /data/uploads
+            - name: SECRET_KEY_BASE
+              valueFrom:
+                secretKeyRef:
+                  name: inkit-runtime
+                  key: SECRET_KEY_BASE
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: inkit-data
+

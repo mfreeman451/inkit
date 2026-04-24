@@ -66,6 +66,7 @@ Browser chat streams through Phoenix LiveView rather than SSE.
 - ETS cache boundary for non-authoritative local caching
 - Credo, ExUnit, and Playwright
 - Docker and GitHub Actions
+- Kustomize and Argo CD manifests for Kubernetes deployment
 
 ## Tests
 

@@ -1,0 +1,16 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: carverauto-web-tls
+  namespace: carverauto-web
+spec:
+  secretName: carverauto-web-tls
+  issuerRef:
+    name: carverauto-issuer
+    kind: ClusterIssuer
+  privateKey:
+    rotationPolicy: Always
+  dnsNames:
+    - carverauto.dev
+    - www.carverauto.dev
+    - inkit.carverauto.dev
