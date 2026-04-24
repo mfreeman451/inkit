@@ -88,7 +88,7 @@ test("uploads an image, records it as recent, and streams a chat answer", async 
   await expect(page.getByText("What do you notice?").first()).toBeVisible();
 
   await page.getByRole("button", { name: "Activity" }).click();
-  await expect(page.getByText("Activity")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible();
   await expect(page.getByText("/live/chat").first()).toBeVisible();
 
   await page.locator("nav").getByRole("button", { name: "Uploads" }).click();
