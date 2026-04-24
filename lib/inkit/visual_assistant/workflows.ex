@@ -413,6 +413,15 @@ defmodule Inkit.VisualAssistant.Workflows do
       {:error, :enoent} ->
         :ok
 
+      {:error, reason} when reason in [:erofs, :eacces] ->
+        if String.starts_with?(image.storage_path, "/app/demo/uploads/") do
+          Logger.warning("Skipping delete for read-only demo upload #{image.storage_path}")
+          :ok
+        else
+          Logger.warning("Could not delete #{image.storage_path}: #{inspect(reason)}")
+          {:error, {:file_delete_failed, reason}}
+        end
+
       {:error, reason} ->
         Logger.warning("Could not delete #{image.storage_path}: #{inspect(reason)}")
         {:error, {:file_delete_failed, reason}}

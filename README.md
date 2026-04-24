@@ -18,6 +18,16 @@ Open `http://localhost:4000`. SQLite data and uploads live in the
 `inkit_data` Docker volume. The image ships with a demo SQLite database plus
 two sample images (kitchen and bathroom), so the UI has content on first load.
 
+On a remote server, publish on all interfaces and set the external host used by
+Phoenix:
+
+```bash
+PHX_HOST=your-server.example.com SECRET_KEY_BASE="$(openssl rand -base64 48)" docker compose up --build
+```
+
+Use `INKIT_BIND=127.0.0.1` only when you intentionally want the Docker port
+bound to localhost.
+
 Validate the REST API against a running instance:
 
 ```bash

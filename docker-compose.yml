@@ -2,12 +2,12 @@ services:
   app:
     build: .
     ports:
-      - "4000:4000"
+      - "${INKIT_BIND:-0.0.0.0}:${INKIT_PORT:-4000}:4000"
     environment:
       PHX_SERVER: "true"
-      PHX_HOST: "localhost"
-      PHX_SCHEME: "http"
-      PHX_URL_PORT: "4000"
+      PHX_HOST: "${PHX_HOST:-localhost}"
+      PHX_SCHEME: "${PHX_SCHEME:-http}"
+      PHX_URL_PORT: "${PHX_URL_PORT:-4000}"
       PORT: "4000"
       DATABASE_PATH: "/data/inkit.db"
       UPLOAD_DIR: "/data/uploads"
