@@ -27,6 +27,7 @@ spec:
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
@@ -56,6 +57,8 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: 100m
@@ -81,4 +84,5 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: inkit-data
-
+        - name: tmp
+          emptyDir: {}

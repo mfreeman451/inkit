@@ -23,7 +23,11 @@ The release workflow publishes that tag after a GitHub release/tag build.
 - Persistent data: `inkit-data` PVC mounted at `/data`
 - SQLite path: `/data/inkit.db`
 - Upload path: `/data/uploads`
+- Writable temp path: ephemeral `emptyDir` mounted at `/tmp`
 - Runtime secret: `inkit-runtime`, committed as a SealedSecret
+
+The container runs with a read-only root filesystem. Persistent application
+state is limited to `/data`, and temporary runtime files are limited to `/tmp`.
 
 The app does not allocate a dedicated MetalLB address. It reuses the existing
 `carverauto-web-gateway` LoadBalancer IP and adds a hostname-specific

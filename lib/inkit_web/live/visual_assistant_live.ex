@@ -53,7 +53,7 @@ defmodule InkitWeb.VisualAssistantLive do
 
     case results do
       [{image, analysis}] ->
-        VisualAssistant.record_api_log(%{
+        VisualAssistant.record_api_log_async(%{
           method: "LIVE",
           path: "/live/upload",
           status: 201,
@@ -266,7 +266,7 @@ defmodule InkitWeb.VisualAssistantLive do
   defp handle_active_stream(stream, [], socket) do
     case VisualAssistant.persist_stream(stream) do
       :ok ->
-        VisualAssistant.record_api_log(%{
+        VisualAssistant.record_api_log_async(%{
           method: "LIVE",
           path: "/live/chat",
           status: 200,
