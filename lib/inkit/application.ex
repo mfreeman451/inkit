@@ -12,10 +12,11 @@ defmodule Inkit.Application do
       Inkit.Repo,
       Inkit.Cache,
       Inkit.RateLimiter,
-      Inkit.VisualAssistant.Retention,
       {Task.Supervisor, name: Inkit.TaskSupervisor},
+      Inkit.Release.SqliteCompatibility,
       {Ecto.Migrator,
        repos: Application.fetch_env!(:inkit, :ecto_repos), skip: skip_migrations()},
+      Inkit.VisualAssistant.Retention,
       {DNSCluster, query: Application.get_env(:inkit, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Inkit.PubSub},
       # Start a worker by calling: Inkit.Worker.start_link(arg)
