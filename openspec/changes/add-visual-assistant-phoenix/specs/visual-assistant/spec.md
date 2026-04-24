@@ -39,6 +39,19 @@ The system SHALL provide Phoenix LiveView streaming chat for a previously upload
 - **WHEN** a user submits an empty question in the LiveView interface
 - **THEN** the system shows a safe validation error and does not append a conversation message
 
+### Requirement: SSE Streaming Chat API
+The system SHALL expose a REST-style SSE endpoint for a previously uploaded image that emits OpenAI-style `chat.completion.chunk` data frames and terminates the event stream with `data: [DONE]`.
+
+#### Scenario: API client streams a chat response
+- **GIVEN** an image has been uploaded
+- **WHEN** a client submits a valid streaming chat request for that image
+- **THEN** the system returns `text/event-stream`, emits ordered JSON chunks using the OpenAI chat completion chunk envelope, sends `data: [DONE]`, and persists the completed user and assistant messages
+
+#### Scenario: Streaming chat request fails validation
+- **GIVEN** the API is running
+- **WHEN** a client submits an invalid streaming chat request
+- **THEN** the system returns a structured JSON error before opening the SSE stream
+
 ### Requirement: Non-Streaming Chat API
 The system SHALL expose a REST-style chat endpoint that accepts a question for a previously uploaded image, appends user and assistant messages to that image's history, and returns a mock OpenAI-compatible non-streaming chat response.
 

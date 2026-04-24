@@ -32,6 +32,7 @@ defmodule InkitWeb.Router do
 
     post "/upload", VisualAssistantController, :upload
     post "/chat/:image_id", VisualAssistantController, :chat
+    post "/chat/:image_id/stream", VisualAssistantController, :stream_chat
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

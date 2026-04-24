@@ -49,13 +49,23 @@ curl -s -X POST http://localhost:4000/chat/IMAGE_ID \
   -d '{"question":"What style is this image?"}'
 ```
 
+Stream a chat answer with OpenAI-style SSE chunks:
+
+```bash
+curl -N -X POST http://localhost:4000/chat/IMAGE_ID/stream \
+  -H "content-type: application/json" \
+  -d '{"question":"What do you notice?"}'
+```
+
 Fetch an uploaded image:
 
 ```bash
 curl -s http://localhost:4000/images/IMAGE_ID --output image.jpg
 ```
 
-Browser chat streams through Phoenix LiveView rather than SSE.
+Browser chat streams through Phoenix LiveView. The REST API also includes
+`POST /chat/:image_id/stream` for SSE clients that expect OpenAI-style
+`chat.completion.chunk` frames ending with `data: [DONE]`.
 
 ## Stack
 
@@ -85,7 +95,8 @@ Playwright runs on port `4003` with its own temporary SQLite database and upload
 
 - Upload endpoint validates supported image content and size.
 - Non-streaming chat endpoint persists user and assistant messages.
-- LiveView chat streams assistant chunks without a separate SSE endpoint.
+- LiveView chat streams assistant chunks, and the REST API exposes an SSE chat
+  stream compatible with OpenAI Chat Completions chunk framing.
 - Conversations, labels, uploads, usage counters, and API logs are persisted in SQLite.
 - The UI includes conversation selection, upload management, settings cleanup, docs, memory, and activity panels.
 - Docker Compose starts the app without requiring a local Elixir toolchain.

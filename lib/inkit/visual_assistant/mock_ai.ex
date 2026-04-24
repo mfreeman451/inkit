@@ -5,6 +5,7 @@ defmodule Inkit.VisualAssistant.MockAI do
 
   @model "mock-gpt-4o-mini"
   @vision_model "mock-gpt-4o-mini-vision"
+  @system_fingerprint "fp_mock_visual_assistant"
 
   def vision_analysis(%UploadedImage{} = image) do
     content = mock_scene_analysis(image)
@@ -37,7 +38,17 @@ defmodule Inkit.VisualAssistant.MockAI do
       "object" => "chat.completion.chunk",
       "created" => created,
       "model" => @model,
-      "choices" => [%{"index" => 0, "delta" => %{"role" => "assistant"}, "finish_reason" => nil}]
+      "system_fingerprint" => @system_fingerprint,
+      "service_tier" => "default",
+      "choices" => [
+        %{
+          "index" => 0,
+          "delta" => %{"role" => "assistant", "content" => "", "refusal" => nil},
+          "logprobs" => nil,
+          "finish_reason" => nil
+        }
+      ],
+      "usage" => nil
     }
 
     chunks =
@@ -49,7 +60,17 @@ defmodule Inkit.VisualAssistant.MockAI do
           "object" => "chat.completion.chunk",
           "created" => created,
           "model" => @model,
-          "choices" => [%{"index" => 0, "delta" => %{"content" => token}, "finish_reason" => nil}]
+          "system_fingerprint" => @system_fingerprint,
+          "service_tier" => "default",
+          "choices" => [
+            %{
+              "index" => 0,
+              "delta" => %{"content" => token},
+              "logprobs" => nil,
+              "finish_reason" => nil
+            }
+          ],
+          "usage" => nil
         }
       end)
 
@@ -58,7 +79,12 @@ defmodule Inkit.VisualAssistant.MockAI do
       "object" => "chat.completion.chunk",
       "created" => created,
       "model" => @model,
-      "choices" => [%{"index" => 0, "delta" => %{}, "finish_reason" => "stop"}]
+      "system_fingerprint" => @system_fingerprint,
+      "service_tier" => "default",
+      "choices" => [
+        %{"index" => 0, "delta" => %{}, "logprobs" => nil, "finish_reason" => "stop"}
+      ],
+      "usage" => nil
     }
 
     {response, [start | chunks] ++ [finish]}
@@ -212,21 +238,39 @@ defmodule Inkit.VisualAssistant.MockAI do
     completion_tokens = Keyword.fetch!(usage, :completion_tokens)
 
     %{
-      "id" => "chatcmpl_#{unique_id()}",
+      "id" => "chatcmpl-#{unique_id()}",
       "object" => "chat.completion",
       "created" => System.system_time(:second),
       "model" => model,
+      "system_fingerprint" => @system_fingerprint,
+      "service_tier" => "default",
       "choices" => [
         %{
           "index" => 0,
-          "message" => %{"role" => "assistant", "content" => content},
+          "message" => %{
+            "role" => "assistant",
+            "content" => content,
+            "refusal" => nil,
+            "annotations" => []
+          },
+          "logprobs" => nil,
           "finish_reason" => "stop"
         }
       ],
       "usage" => %{
         "prompt_tokens" => prompt_tokens,
         "completion_tokens" => completion_tokens,
-        "total_tokens" => prompt_tokens + completion_tokens
+        "total_tokens" => prompt_tokens + completion_tokens,
+        "prompt_tokens_details" => %{
+          "audio_tokens" => 0,
+          "cached_tokens" => 0
+        },
+        "completion_tokens_details" => %{
+          "accepted_prediction_tokens" => 0,
+          "audio_tokens" => 0,
+          "reasoning_tokens" => 0,
+          "rejected_prediction_tokens" => 0
+        }
       }
     }
   end

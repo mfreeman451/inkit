@@ -1,6 +1,8 @@
 defmodule InkitWeb.VisualAssistantController do
   use InkitWeb, :controller
 
+  require Logger
+
   alias Inkit.VisualAssistant.Workflows, as: VisualAssistant
 
   def upload(conn, params) do
@@ -40,6 +42,15 @@ defmodule InkitWeb.VisualAssistantController do
     end
   end
 
+  def stream_chat(conn, %{"image_id" => image_id} = params) do
+    prompt = prompt_param(params)
+
+    case VisualAssistant.prepare_stream(image_id, prompt) do
+      {:ok, stream} -> stream_sse(conn, stream)
+      {:error, reason} -> error(conn, reason)
+    end
+  end
+
   defp fetch_upload(%{"image" => %Plug.Upload{} = upload}), do: {:ok, upload}
   defp fetch_upload(%{"file" => %Plug.Upload{} = upload}), do: {:ok, upload}
   defp fetch_upload(_params), do: {:error, :missing_file}
@@ -54,6 +65,69 @@ defmodule InkitWeb.VisualAssistantController do
     conn
     |> put_status(status)
     |> json(%{error: %{code: code, message: message}})
+  end
+
+  defp stream_sse(conn, stream) do
+    conn =
+      conn
+      |> put_resp_content_type("text/event-stream")
+      |> put_resp_header("cache-control", "no-cache")
+      |> put_resp_header("x-accel-buffering", "no")
+      |> send_chunked(:ok)
+
+    case write_stream_chunks(conn, stream.chunks) do
+      {:ok, conn} ->
+        case VisualAssistant.persist_stream(stream) do
+          :ok ->
+            write_sse_done(conn)
+
+          {:error, reason} ->
+            Logger.warning("Could not persist streamed chat: #{inspect(reason)}")
+            write_sse_error(conn, reason)
+        end
+
+      {:error, reason, conn} ->
+        Logger.warning("SSE chat stream stopped before completion: #{inspect(reason)}")
+        conn
+    end
+  end
+
+  defp write_stream_chunks(conn, chunks) do
+    Enum.reduce_while(chunks, {:ok, conn}, fn payload, {:ok, conn} ->
+      case chunk(conn, sse_data(payload)) do
+        {:ok, conn} -> {:cont, {:ok, conn}}
+        {:error, reason} -> {:halt, {:error, reason, conn}}
+      end
+    end)
+  end
+
+  defp write_sse_done(conn) do
+    case chunk(conn, "data: [DONE]\n\n") do
+      {:ok, conn} ->
+        conn
+
+      {:error, reason} ->
+        tap(conn, fn _conn -> Logger.warning("Could not write SSE done: #{inspect(reason)}") end)
+    end
+  end
+
+  defp write_sse_error(conn, reason) do
+    payload = %{error: %{code: error_code(reason), message: elem(error_details(reason), 2)}}
+
+    case chunk(conn, "event: error\n" <> sse_data(payload) <> "data: [DONE]\n\n") do
+      {:ok, conn} ->
+        conn
+
+      {:error, reason} ->
+        tap(conn, fn _conn -> Logger.warning("Could not write SSE error: #{inspect(reason)}") end)
+    end
+  end
+
+  defp sse_data(payload), do: "data: #{Jason.encode!(payload)}\n\n"
+
+  defp error_code(reason) do
+    {_status, code, _message} = error_details(reason)
+    code
   end
 
   defp error_details(:missing_file),

@@ -33,6 +33,11 @@ ownership of the existing `carverauto.dev` or `www.carverauto.dev` certificate.
 Traffic routes from the `carverauto-web` namespace to the `inkit` service
 through a `ReferenceGrant`.
 
+The `inkit-tls` certificate and `HTTPRoute` live in `carverauto-web` because
+Gateway listener TLS secrets must be local to the Gateway namespace. The app
+workload, PVC, runtime secret, service, and network policies remain isolated in
+the `inkit` namespace.
+
 ## Argo CD
 
 Apply the Argo CD application from a machine with cluster access:

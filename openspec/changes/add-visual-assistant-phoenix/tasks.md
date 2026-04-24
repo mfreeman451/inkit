@@ -12,13 +12,13 @@
 
 ## 3. Mock AI
 - [x] 3.1 Implement mock image analysis responses with OpenAI-style IDs, timestamps, content, and usage metadata.
-- [x] 3.2 Implement mock streaming chat responses that include conversation context.
+- [x] 3.2 Implement mock streaming chat responses that include conversation context and OpenAI-style chat completion chunk envelopes.
 - [x] 3.3 Implement mock streaming chat chunks for LiveView rendering.
 
 ## 4. API
 - [x] 4.1 Add multipart image upload endpoint with size limits, content validation, metadata persistence, and structured errors.
 - [x] 4.2 Add non-streaming chat endpoint scoped to an uploaded image.
-- [x] 4.3 Remove SSE as a public API requirement.
+- [x] 4.3 Add SSE chat endpoint for API clients while retaining Phoenix LiveView streaming for the browser UI.
 - [x] 4.4 Add consistent error JSON and status codes for validation, missing records, unsupported media, and internal failures.
 - [x] 4.5 Add image render route for the LiveView demo.
 
