@@ -32,20 +32,9 @@ function bathroomImagePath() {
   return fallback;
 }
 
-async function clearAllData(page) {
-  await page.locator("nav").getByRole("button", { name: "Settings" }).click();
-  await expectFrameHeading(page, "Settings");
-
-  const clearButton = page.getByRole("button", { name: /clear images and conversations/i });
-  if (await clearButton.isEnabled()) {
-    page.once("dialog", (dialog) => dialog.accept());
-    await clearButton.click();
-    await expect(page.getByText("No recent conversations.")).toBeVisible();
-  }
-}
-
 async function waitForLiveView(page) {
   await page.waitForFunction(() => window.liveSocket?.isConnected());
+  await expect(page.locator("#conversation-frame")).toBeVisible();
 }
 
 async function expectFrameHeading(page, name) {
@@ -61,7 +50,6 @@ test("uploads an image, records it as recent, and streams a chat answer", async 
 
   await page.goto("/");
   await waitForLiveView(page);
-  await clearAllData(page);
   await page.locator("nav").getByRole("button", { name: "Conversations" }).click();
   await page.getByRole("button", { name: /^New$/ }).click();
 
