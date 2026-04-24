@@ -35,6 +35,12 @@ COPY --chown=inkit:inkit priv/demo ./demo
 
 RUN chmod +x ./bin/docker-entrypoint
 
+# Create the data dir with the non-root owner BEFORE declaring USER/VOLUME so
+# that Docker seeds a freshly-created named volume with inkit:inkit ownership
+# on first mount. Otherwise the volume is root-owned and the non-root runtime
+# user cannot create `/data/uploads` or the SQLite file.
+RUN mkdir -p /data /data/uploads && chown -R inkit:inkit /data
+
 ENV HOME=/app \
     PHX_SERVER=true \
     PHX_HOST=localhost \
@@ -43,6 +49,8 @@ ENV HOME=/app \
     PORT=4000 \
     DATABASE_PATH=/data/inkit.db \
     UPLOAD_DIR=/data/uploads
+
+VOLUME ["/data"]
 
 USER inkit
 
