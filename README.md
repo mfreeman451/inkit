@@ -1,5 +1,8 @@
 # Visual Assistant API
 
+[![Release](https://github.com/mfreeman451/inkit/actions/workflows/release.yml/badge.svg)](https://github.com/mfreeman451/inkit/actions/workflows/release.yml)
+[![CI](https://github.com/mfreeman451/inkit/actions/workflows/ci.yml/badge.svg)](https://github.com/mfreeman451/inkit/actions/workflows/ci.yml)
+
 Phoenix implementation of the Inkit take-home exercise. The app supports image upload, initial mock vision analysis, non-streaming API chat, Phoenix LiveView streaming chat, per-image conversation history, SQLite persistence, API request logs, and a small reviewer-facing UI.
 
 ## Quick Start
