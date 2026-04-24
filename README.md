@@ -9,7 +9,7 @@ Phoenix implementation of the Inkit take-home exercise. The app supports image u
 The easiest evaluator path is Docker Compose:
 
 ```bash
-docker compose up --build
+SECRET_KEY_BASE="$(openssl rand -base64 48)" docker compose up --build
 ```
 
 The container prints the URL at startup. Open `http://localhost:4000`.
@@ -102,4 +102,3 @@ SQLite and local disk storage keep the project easy to run. That is appropriate 
 This project was built with OpenAI Codex using GPT-5.5 at high reasoning effort as a coding assistant. I used OpenSpec for spec-driven development: the Phoenix/Ash implementation was planned in `openspec/changes/add-visual-assistant-phoenix`, validated with OpenSpec, then implemented and tested against that checklist.
 
 AI was used to accelerate scaffolding, implementation, test writing, UI iteration, and documentation. I made the architecture and trade-off decisions, reviewed the generated code, ran the verification suite, and adjusted behavior where the implementation did not meet the take-home requirements.
-

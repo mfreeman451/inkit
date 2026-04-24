@@ -49,36 +49,39 @@ defmodule InkitWeb.VisualAssistantController do
   end
 
   defp error(conn, reason) do
-    {status, code, message} =
-      case reason do
-        :missing_file ->
-          {:bad_request, "missing_file", "Upload a file in the image or file field."}
-
-        :empty_file ->
-          {:bad_request, "empty_file", "Uploaded file is empty."}
-
-        :file_too_large ->
-          {:payload_too_large, "file_too_large", "Uploaded file exceeds 16 MB."}
-
-        :unsupported_media_type ->
-          {:unsupported_media_type, "unsupported_media_type",
-           "Only png, jpg, jpeg, and gif images are supported."}
-
-        :empty_prompt ->
-          {:bad_request, "empty_prompt", "Question must not be empty."}
-
-        :not_found ->
-          {:not_found, "not_found", "Image was not found."}
-
-        %Ash.Error.Invalid{} ->
-          {:unprocessable_entity, "validation_failed", "Request could not be saved."}
-
-        _ ->
-          {:internal_server_error, "internal_error", "Request could not be completed."}
-      end
+    {status, code, message} = error_details(reason)
 
     conn
     |> put_status(status)
     |> json(%{error: %{code: code, message: message}})
   end
+
+  defp error_details(:missing_file),
+    do: {:bad_request, "missing_file", "Upload a file in the image or file field."}
+
+  defp error_details(:empty_file),
+    do: {:bad_request, "empty_file", "Uploaded file is empty."}
+
+  defp error_details(:file_too_large),
+    do: {:payload_too_large, "file_too_large", "Uploaded file exceeds 16 MB."}
+
+  defp error_details(:unsupported_media_type),
+    do:
+      {:unsupported_media_type, "unsupported_media_type",
+       "Only png, jpg, jpeg, and gif images are supported."}
+
+  defp error_details(:empty_prompt),
+    do: {:bad_request, "empty_prompt", "Question must not be empty."}
+
+  defp error_details(:not_found),
+    do: {:not_found, "not_found", "Image was not found."}
+
+  defp error_details(:storage_missing),
+    do: {:not_found, "storage_missing", "Image file was missing and stale data was removed."}
+
+  defp error_details(%Ash.Error.Invalid{}),
+    do: {:unprocessable_entity, "validation_failed", "Request could not be saved."}
+
+  defp error_details(_reason),
+    do: {:internal_server_error, "internal_error", "Request could not be completed."}
 end

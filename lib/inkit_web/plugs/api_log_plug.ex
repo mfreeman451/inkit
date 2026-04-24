@@ -16,7 +16,7 @@ defmodule InkitWeb.Plugs.ApiLogPlug do
         |> Kernel.-(start_time)
         |> div(1000)
 
-      Workflows.record_api_log(%{
+      Workflows.record_api_log_async(%{
         method: conn.method,
         path: conn.request_path,
         status: conn.status || 0,

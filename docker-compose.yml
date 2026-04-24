@@ -11,7 +11,7 @@ services:
       PORT: "4000"
       DATABASE_PATH: "/data/inkit.db"
       UPLOAD_DIR: "/data/uploads"
-      SECRET_KEY_BASE: "r6qhwgJmhh/WBzy9fd+AW+/7JB26wCwIEJW6z4F4u2bikp4Z4Lf7ANnJyuee7jKS"
+      SECRET_KEY_BASE: "${SECRET_KEY_BASE:?set with: openssl rand -base64 48}"
     volumes:
       - inkit_data:/data
 

@@ -37,7 +37,9 @@ defmodule Inkit.VisualAssistant.FileStorage do
   defp validate_size(_size), do: :ok
 
   defp detect_content_type(path) do
-    with {:ok, bytes} <- File.read(path) do
+    with {:ok, file} <- File.open(path, [:read, :binary]),
+         bytes <- IO.binread(file, 16),
+         :ok <- File.close(file) do
       cond do
         match?(<<0x89, "PNG", 0x0D, 0x0A, 0x1A, 0x0A, _::binary>>, bytes) -> {:ok, "image/png"}
         match?(<<0xFF, 0xD8, 0xFF, _::binary>>, bytes) -> {:ok, "image/jpeg"}
@@ -51,7 +53,7 @@ defmodule Inkit.VisualAssistant.FileStorage do
   defp validate_extension(filename, content_type) do
     ext = filename |> to_string() |> Path.extname() |> String.downcase()
 
-    if ext in Map.fetch!(@types, content_type) do
+    if ext in Map.get(@types, content_type, []) do
       :ok
     else
       {:error, :unsupported_media_type}
@@ -59,9 +61,14 @@ defmodule Inkit.VisualAssistant.FileStorage do
   end
 
   defp sha256(path) do
-    with {:ok, bytes} <- File.read(path) do
-      {:ok, bytes |> then(&:crypto.hash(:sha256, &1)) |> Base.encode16(case: :lower)}
-    end
+    path
+    |> File.stream!(2048, [])
+    |> Enum.reduce(:crypto.hash_init(:sha256), &:crypto.hash_update(&2, &1))
+    |> :crypto.hash_final()
+    |> Base.encode16(case: :lower)
+    |> then(&{:ok, &1})
+  rescue
+    File.Error -> {:error, :missing_file}
   end
 
   defp copy_upload(path, content_type) do

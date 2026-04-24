@@ -2,6 +2,7 @@ defmodule Inkit.VisualAssistant.Workflows do
   @moduledoc false
 
   require Ash.Query
+  require Logger
 
   alias Inkit.Cache
   alias Inkit.Repo
@@ -26,7 +27,8 @@ defmodule Inkit.VisualAssistant.Workflows do
           {:ok, image}
         else
           Cache.delete(cache_key)
-          {:error, :not_found}
+          cleanup_missing_image(image)
+          {:error, :storage_missing}
         end
 
       :miss ->
@@ -37,6 +39,22 @@ defmodule Inkit.VisualAssistant.Workflows do
   def list_messages(public_id) do
     with {:ok, image} <- get_image(public_id) do
       {:ok, messages_for_image(image.id)}
+    end
+  end
+
+  def list_messages_for_images([]), do: {:ok, %{}}
+
+  def list_messages_for_images(images) do
+    image_ids = Enum.map(images, & &1.id)
+
+    Message
+    |> Ash.Query.for_read(:read)
+    |> Ash.Query.filter(uploaded_image_id in ^image_ids)
+    |> Ash.Query.sort(inserted_at: :asc, id: :asc)
+    |> Ash.read()
+    |> case do
+      {:ok, messages} -> {:ok, Enum.group_by(messages, & &1.uploaded_image_id)}
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -81,21 +99,33 @@ defmodule Inkit.VisualAssistant.Workflows do
       |> Ash.read()
 
     with {:ok, logs} <- logs,
-         {:ok, all_logs} <- list_api_logs(10_000) do
-      {:ok, logs, length(all_logs)}
+         {:ok, total} <- count_api_logs() do
+      {:ok, logs, total}
     end
   end
 
-  def usage_summary do
-    case list_api_logs(10_000) do
-      {:ok, logs} ->
-        %{
-          image_uploads: Enum.count(logs, &upload_log?/1),
-          api_requests: length(logs)
-        }
+  def list_api_logs_for_image(public_id, limit \\ 10) do
+    ApiLog
+    |> Ash.Query.for_read(:read)
+    |> Ash.Query.filter(image_public_id == ^public_id)
+    |> Ash.Query.sort(inserted_at: :desc)
+    |> Ash.Query.limit(limit)
+    |> Ash.read()
+  end
 
+  def usage_summary do
+    with {:ok, uploads} <- count_upload_logs(),
+         {:ok, total} <- count_api_logs() do
+      %{
+        image_uploads: uploads,
+        api_requests: total
+      }
+    else
       {:error, _reason} ->
-        %{image_uploads: 0, api_requests: 0}
+        %{
+          image_uploads: 0,
+          api_requests: 0
+        }
     end
   end
 
@@ -111,6 +141,33 @@ defmodule Inkit.VisualAssistant.Workflows do
     |> Ash.create()
   end
 
+  def record_api_log_async(attrs) do
+    if Application.get_env(:inkit, :async_api_logs, true) do
+      case start_api_log_task(attrs) do
+        {:ok, _pid} ->
+          :ok
+
+        {:error, reason} ->
+          Logger.warning("Could not start API log task: #{inspect(reason)}")
+          :ok
+      end
+    else
+      safe_record_api_log(attrs)
+    end
+  end
+
+  defp start_api_log_task(attrs) do
+    case Process.whereis(Inkit.TaskSupervisor) do
+      nil ->
+        Task.start(fn -> safe_record_api_log(attrs) end)
+
+      _pid ->
+        Task.Supervisor.start_child(Inkit.TaskSupervisor, fn -> safe_record_api_log(attrs) end)
+    end
+  catch
+    :exit, reason -> {:error, reason}
+  end
+
   def chat(public_id, prompt) do
     with :ok <- validate_prompt(prompt),
          {:ok, image} <- get_image(public_id) do
@@ -123,6 +180,10 @@ defmodule Inkit.VisualAssistant.Workflows do
   end
 
   def prepare_stream(public_id, prompt) do
+    # Mock streaming is pseudo-streaming: the full deterministic response is
+    # built first, then LiveView dribbles these chunks with Process.send_after/3.
+    # A real provider integration should replace this boundary with provider
+    # streaming instead of assuming these chunks are generated incrementally.
     with :ok <- validate_prompt(prompt),
          {:ok, image} <- get_image(public_id) do
       history = messages_for_image(image.id)
@@ -158,7 +219,6 @@ defmodule Inkit.VisualAssistant.Workflows do
       label: image.label,
       content_type: image.content_type,
       size: image.size,
-      sha256: image.sha256,
       inserted_at: image.inserted_at
     }
   end
@@ -176,7 +236,7 @@ defmodule Inkit.VisualAssistant.Workflows do
 
   def delete_image(public_id) do
     with {:ok, image} <- get_image(public_id) do
-      transaction(fn ->
+      transaction_ok(fn ->
         delete_messages(image)
         delete_image_record(image)
       end)
@@ -184,26 +244,20 @@ defmodule Inkit.VisualAssistant.Workflows do
   end
 
   def clear_all do
-    transaction(fn ->
-      UploadedImage
-      |> Ash.Query.for_read(:read)
-      |> Ash.read!()
-      |> Enum.each(fn image ->
-        image.id
-        |> messages_for_image()
-        |> Enum.each(&Ash.destroy!/1)
-
-        Ash.destroy!(image)
-        File.rm(image.storage_path)
-      end)
-
-      Cache.clear()
-      :ok
+    transaction_ok(fn ->
+      with :ok <-
+             UploadedImage
+             |> Ash.Query.for_read(:read)
+             |> Ash.read!()
+             |> delete_all_images() do
+        Cache.clear()
+        :ok
+      end
     end)
   end
 
   def clear_api_logs do
-    transaction(fn ->
+    transaction_ok(fn ->
       ApiLog
       |> Ash.Query.for_read(:read)
       |> Ash.read!()
@@ -232,7 +286,8 @@ defmodule Inkit.VisualAssistant.Workflows do
           Cache.put(cache_key, image)
           {:ok, image}
         else
-          {:error, :not_found}
+          cleanup_missing_image(image)
+          {:error, :storage_missing}
         end
 
       {:error, error} ->
@@ -246,6 +301,18 @@ defmodule Inkit.VisualAssistant.Workflows do
 
   defp image_file_available?(_image), do: false
 
+  defp cleanup_missing_image(image) do
+    Logger.warning("Cleaning up image #{image.public_id}: storage file is missing")
+
+    case transaction_ok(fn ->
+           delete_messages(image)
+           delete_image_record(image)
+         end) do
+      :ok -> :ok
+      {:error, reason} -> Logger.warning("Could not clean up missing image: #{inspect(reason)}")
+    end
+  end
+
   defp create_message(image, role, content, response_id \\ nil) do
     Message
     |> Ash.Changeset.for_create(:create, %{
@@ -258,7 +325,7 @@ defmodule Inkit.VisualAssistant.Workflows do
   end
 
   defp persist_exchange(image, prompt, assistant_content, response_id, return_value) do
-    transaction(fn ->
+    transaction_value(fn ->
       with {:ok, _user} <- create_message(image, "user", prompt),
            {:ok, _assistant} <- create_message(image, "assistant", assistant_content, response_id) do
         return_value
@@ -279,12 +346,25 @@ defmodule Inkit.VisualAssistant.Workflows do
     |> Enum.each(&Ash.destroy!/1)
   end
 
+  defp delete_all_images(images) do
+    Enum.reduce_while(images, :ok, fn image, :ok ->
+      delete_messages(image)
+
+      case delete_image_record(image) do
+        :ok -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
   defp delete_image_record(image) do
-    case Ash.destroy(image) do
+    with :ok <- delete_stored_file(image),
+         :ok <- Ash.destroy(image) do
+      Cache.delete({:image, image.public_id})
+      Cache.delete({:analysis, image.public_id})
+      :ok
+    else
       :ok ->
-        File.rm(image.storage_path)
-        Cache.delete({:image, image.public_id})
-        Cache.delete({:analysis, image.public_id})
         :ok
 
       {:error, reason} ->
@@ -292,14 +372,37 @@ defmodule Inkit.VisualAssistant.Workflows do
     end
   end
 
-  defp transaction(fun) do
-    Repo.transaction(fn ->
-      case fun.() do
-        {:error, reason} -> Repo.rollback(reason)
-        value -> value
-      end
-    end)
+  defp delete_stored_file(image) do
+    case File.rm(image.storage_path) do
+      :ok ->
+        :ok
+
+      {:error, :enoent} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning("Could not delete #{image.storage_path}: #{inspect(reason)}")
+        {:error, {:file_delete_failed, reason}}
+    end
   end
+
+  defp transaction_value(fun) do
+    case Repo.transaction(fn -> rollback_on_error(fun.()) end) do
+      {:ok, value} -> {:ok, value}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp transaction_ok(fun) do
+    case Repo.transaction(fn -> rollback_on_error(fun.()) end) do
+      {:ok, :ok} -> :ok
+      {:ok, value} -> {:ok, value}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp rollback_on_error({:error, reason}), do: Repo.rollback(reason)
+  defp rollback_on_error(value), do: value
 
   defp validate_prompt(prompt) when is_binary(prompt) do
     if String.trim(prompt) == "" do
@@ -321,8 +424,28 @@ defmodule Inkit.VisualAssistant.Workflows do
     end
   end
 
-  defp upload_log?(%{path: path, status: status}) do
-    path in ["/upload", "/live/upload"] and status in 200..299
+  defp count_api_logs do
+    ApiLog
+    |> Ash.Query.for_read(:read)
+    |> Ash.count()
+  end
+
+  defp count_upload_logs do
+    paths = ["/upload", "/live/upload"]
+
+    ApiLog
+    |> Ash.Query.for_read(:read)
+    |> Ash.Query.filter(path in ^paths and status >= 200 and status <= 299)
+    |> Ash.count()
+  end
+
+  defp safe_record_api_log(attrs) do
+    case record_api_log(attrs) do
+      {:ok, _log} -> :ok
+      {:error, reason} -> Logger.warning("Could not record API log: #{inspect(reason)}")
+    end
+  catch
+    :exit, reason -> Logger.warning("Could not record API log: #{inspect(reason)}")
   end
 
   defp unique_id do

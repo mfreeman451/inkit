@@ -65,9 +65,22 @@ defmodule Inkit.VisualAssistant.WorkflowsTest do
       Workflows.create_image_from_upload(upload.path, upload.filename, upload.content_type)
 
     assert {:ok, _response} = Workflows.chat(image.public_id, "What is in this image?")
-    assert {:ok, :ok} = Workflows.delete_image(image.public_id)
+    assert :ok = Workflows.delete_image(image.public_id)
     assert {:error, :not_found} = Workflows.get_image(image.public_id)
     refute File.exists?(image.storage_path)
+  end
+
+  test "cleans up stale records when the image file is missing" do
+    upload = ImageFixture.png_upload()
+
+    {:ok, image, _analysis} =
+      Workflows.create_image_from_upload(upload.path, upload.filename, upload.content_type)
+
+    assert {:ok, _response} = Workflows.chat(image.public_id, "What is in this image?")
+    File.rm!(image.storage_path)
+
+    assert {:error, :storage_missing} = Workflows.get_image(image.public_id)
+    assert {:error, :not_found} = Workflows.get_image(image.public_id)
   end
 
   test "clears all image and conversation data" do
@@ -81,7 +94,7 @@ defmodule Inkit.VisualAssistant.WorkflowsTest do
       Workflows.create_image_from_upload(second.path, second.filename, second.content_type)
 
     assert {:ok, _response} = Workflows.chat(first_image.public_id, "First?")
-    assert {:ok, :ok} = Workflows.clear_all()
+    assert :ok = Workflows.clear_all()
     assert {:ok, []} = Workflows.list_recent_images()
     assert {:error, :not_found} = Workflows.get_image(first_image.public_id)
     assert {:error, :not_found} = Workflows.get_image(second_image.public_id)

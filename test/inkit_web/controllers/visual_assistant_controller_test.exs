@@ -7,11 +7,12 @@ defmodule InkitWeb.VisualAssistantControllerTest do
     conn = post(conn, ~p"/upload", %{"image" => ImageFixture.png_upload()})
 
     assert %{
-             "image" => %{"id" => image_id, "content_type" => "image/png"},
+             "image" => %{"id" => image_id, "content_type" => "image/png"} = image,
              "analysis" => %{"object" => "chat.completion"}
            } = json_response(conn, 201)
 
     assert String.starts_with?(image_id, "img_")
+    refute Map.has_key?(image, "sha256")
   end
 
   test "POST /upload rejects unsupported files", %{conn: conn} do

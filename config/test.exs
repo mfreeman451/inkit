@@ -11,6 +11,7 @@ config :inkit, Inkit.Repo,
   pool: Ecto.Adapters.SQL.Sandbox
 
 config :inkit, :upload_dir, Path.expand("../tmp/test_uploads", __DIR__)
+config :inkit, :async_api_logs, false
 
 # We don't run a server during test. If one is required,
 # you can enable the server option below.

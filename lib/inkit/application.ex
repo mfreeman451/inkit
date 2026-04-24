@@ -11,6 +11,7 @@ defmodule Inkit.Application do
       InkitWeb.Telemetry,
       Inkit.Repo,
       Inkit.Cache,
+      {Task.Supervisor, name: Inkit.TaskSupervisor},
       {Ecto.Migrator,
        repos: Application.fetch_env!(:inkit, :ecto_repos), skip: skip_migrations()},
       {DNSCluster, query: Application.get_env(:inkit, :dns_cluster_query) || :ignore},

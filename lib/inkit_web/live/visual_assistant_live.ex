@@ -194,7 +194,7 @@ defmodule InkitWeb.VisualAssistantLive do
 
   def handle_event("delete_image", %{"image-id" => public_id}, socket) do
     case VisualAssistant.delete_image(public_id) do
-      {:ok, :ok} ->
+      :ok ->
         {:noreply,
          socket
          |> maybe_clear_active_image(public_id)
@@ -209,7 +209,7 @@ defmodule InkitWeb.VisualAssistantLive do
 
   def handle_event("clear_all", _params, socket) do
     case VisualAssistant.clear_all() do
-      {:ok, :ok} ->
+      :ok ->
         {:noreply,
          socket
          |> assign(:image, nil)
@@ -247,26 +247,34 @@ defmodule InkitWeb.VisualAssistantLive do
   end
 
   def handle_info({:stream_chat, stream, []}, socket) do
-    :ok = VisualAssistant.persist_stream(stream)
+    case VisualAssistant.persist_stream(stream) do
+      :ok ->
+        VisualAssistant.record_api_log(%{
+          method: "LIVE",
+          path: "/live/chat",
+          status: 200,
+          duration_ms: 0,
+          image_public_id: stream.image.public_id
+        })
 
-    VisualAssistant.record_api_log(%{
-      method: "LIVE",
-      path: "/live/chat",
-      status: 200,
-      duration_ms: 0,
-      image_public_id: stream.image.public_id
-    })
+        {:ok, messages} = VisualAssistant.list_messages(stream.image.public_id)
 
-    {:ok, messages} = VisualAssistant.list_messages(stream.image.public_id)
+        {:noreply,
+         socket
+         |> assign(:messages, messages)
+         |> assign(:image_activity_logs, image_activity_logs(stream.image))
+         |> assign(:streaming, false)
+         |> assign(:streamed_response, "")
+         |> assign(:conversation_view, :show)
+         |> refresh_dashboard_data()}
 
-    {:noreply,
-     socket
-     |> assign(:messages, messages)
-     |> assign(:image_activity_logs, image_activity_logs(stream.image))
-     |> assign(:streaming, false)
-     |> assign(:streamed_response, "")
-     |> assign(:conversation_view, :show)
-     |> refresh_dashboard_data()}
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:streaming, false)
+         |> assign(:streamed_response, "")
+         |> assign(:error, human_error(reason))}
+    end
   end
 
   defp human_error(:empty_prompt), do: "Ask a question before sending."
@@ -277,6 +285,7 @@ defmodule InkitWeb.VisualAssistantLive do
   defp human_error(:file_too_large), do: "Uploaded file exceeds 16 MB."
   defp human_error(:missing_file), do: "Choose an image before uploading."
   defp human_error(:not_found), do: "Conversation was not found. Refreshing the list."
+  defp human_error(:storage_missing), do: "Image file was missing. Removed stale conversation."
   defp human_error(_reason), do: "Request could not be completed."
 
   defp recent_images do
@@ -323,24 +332,21 @@ defmodule InkitWeb.VisualAssistantLive do
   defp image_activity_logs(nil), do: []
 
   defp image_activity_logs(image) do
-    case VisualAssistant.list_api_logs(10_000) do
-      {:ok, logs} ->
-        logs
-        |> Enum.filter(&(&1.image_public_id == image.public_id))
-        |> Enum.take(10)
-
-      {:error, _reason} ->
-        []
+    case VisualAssistant.list_api_logs_for_image(image.public_id, 10) do
+      {:ok, logs} -> logs
+      {:error, _reason} -> []
     end
   end
 
   defp conversation_summaries(images) do
+    messages_by_image_id =
+      case VisualAssistant.list_messages_for_images(images) do
+        {:ok, messages_by_image_id} -> messages_by_image_id
+        {:error, _reason} -> %{}
+      end
+
     Enum.map(images, fn image ->
-      messages =
-        case VisualAssistant.list_messages(image.public_id) do
-          {:ok, messages} -> messages
-          {:error, _reason} -> []
-        end
+      messages = Map.get(messages_by_image_id, image.id, [])
 
       %{
         image: image,
