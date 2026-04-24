@@ -6,6 +6,24 @@ metadata:
 spec:
   gatewayClassName: carverauto-web-envoy
   listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: https
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: carverauto-web-tls
+      allowedRoutes:
+        namespaces:
+          from: Same
     - name: https-inkit
       hostname: inkit.carverauto.dev
       port: 443
