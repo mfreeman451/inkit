@@ -1,216 +1,105 @@
-# Senior Software Engineer Interview Scenario: Visual Assistant API
+# Visual Assistant API
 
-This project simulates a multi-stage backend development interview task focused on building a RESTful API with AI integration, streaming, history, and database persistence.
+Phoenix implementation of the Inkit take-home exercise. The app supports image upload, initial mock vision analysis, non-streaming API chat, Phoenix LiveView streaming chat, per-image conversation history, SQLite persistence, API request logs, and a small reviewer-facing UI.
 
-## Setup and Running
+## Quick Start
 
-### Option 1: Using pipenv (Recommended for Unix-based systems)
+### Docker
 
-This project uses `pipenv` for dependency management.
+The easiest evaluator path is Docker Compose:
 
-1. **Prerequisites:**
-   * Python 3.8+
-   * `pipenv` installed (`pip install pipenv`)
+```bash
+docker compose up --build
+```
 
-2. **Install Dependencies:**
-   ```bash
-   pipenv install
-   ```
+The container prints the URL at startup. Open `http://localhost:4000`.
 
-3. **Run the Flask Application:**
-   ```bash
-   pipenv run python app.py
-   ```
-   The API will be available at `http://127.0.0.1:5000`.
+SQLite data and uploads are stored in the `inkit_data` Docker volume.
 
-### Option 2: Using venv (Alternative for Windows)
+### Local
 
-If you're on Windows and encounter issues with pipenv, you can use Python's built-in venv:
+Requirements:
 
-1. **Prerequisites:**
-   * Python 3.8+
-   * Git Bash or PowerShell (recommended for better command-line experience)
+- Elixir 1.15+
+- Erlang/OTP
+- SQLite
+- Node 20+ for Playwright E2E tests
 
-2. **Create and Activate Virtual Environment:**
-   ```bash
-   # Create virtual environment
-   python -m venv venv
+```bash
+mix setup
+mix phx.server
+```
 
-   # Activate virtual environment
-   # In PowerShell:
-   .\venv\Scripts\Activate.ps1
-   # In Git Bash:
-   source venv/Scripts/activate
-   # In Command Prompt:
-   .\venv\Scripts\activate.bat
-   ```
+Open `http://localhost:4000`.
 
-3. **Install Dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+## API
 
-4. **Run the Flask Application:**
-   ```bash
-   python app.py
-   ```
-   The API will be available at `http://127.0.0.1:5000`.
+Upload an image:
 
-### Troubleshooting Windows Setup
+```bash
+curl -s -X POST http://localhost:4000/upload \
+  -F "image=@tmp/kitchen.jpg"
+```
 
-If you encounter any issues with the setup on Windows:
+Ask a non-streaming question:
 
-1. **Python Path Issues:**
-   - Ensure Python is added to your system's PATH
-   - Try using the full path to Python: `C:\Path\To\Python\python.exe -m venv venv`
+```bash
+curl -s -X POST http://localhost:4000/chat/IMAGE_ID \
+  -H "content-type: application/json" \
+  -d '{"question":"What style is this image?"}'
+```
 
-2. **Virtual Environment Activation:**
-   - If activation fails, try running PowerShell as Administrator
-   - For PowerShell, you might need to set the execution policy:
-     ```powershell
-     Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-     ```
+Fetch an uploaded image:
 
-3. **Dependency Installation:**
-   - If pip install fails, try updating pip first:
-     ```bash
-     python -m pip install --upgrade pip
-     ```
-   - For SSL errors, you might need to install certificates:
-     ```bash
-     pip install --upgrade certifi
-     ```
+```bash
+curl -s http://localhost:4000/images/IMAGE_ID --output image.jpg
+```
 
-4. **Port Issues:**
-   - If port 5000 is in use, you can change it in app.py:
-     ```python
-     app.run(debug=True, threaded=True, port=5001)  # or any other available port
-     ```
+Browser chat streams through Phoenix LiveView rather than SSE.
 
-## Interview Questions
+## Stack
 
-This interview is divided into four parts, progressively building upon the API. You will start with the provided `app.py` template and modify it to meet the requirements of each question.
+- Elixir, Phoenix, Phoenix LiveView
+- Ash Framework resources/domains with AshSqlite
+- SQLite through Ecto/AshSqlite
+- Tailwind CSS and daisyUI
+- ETS cache boundary for non-authoritative local caching
+- Credo, ExUnit, and Playwright
+- Docker and GitHub Actions
 
-## Question 1: Foundational API - Image Upload and Basic Chat
+## Tests
 
-**Context:**
-We want to build the initial version of a "Visual Assistant". Users should be able to upload an image, receive some initial analysis, and then ask questions about that image.
+```bash
+mix format --check-formatted
+mix test
+mix credo --strict
+npm ci
+npx playwright install chromium
+npm run test:e2e
+```
 
-**Requirements:**
-1. Implement a RESTful endpoint for image upload that:
-   - Accepts image files via multipart form
-   - Validates file types and content
-   - Handles concurrent uploads efficiently
-   - Implements proper error handling
-   - Returns appropriate status codes and error messages
-   - Generates unique identifiers for uploaded images
-   - Stores image metadata securely
+Playwright runs on port `4003` with its own temporary SQLite database and upload directory, so it does not clear local development data on port `4000`.
 
-2. Implement a chat endpoint that:
-   - Accepts questions about uploaded images
-   - Validates input and handles errors appropriately
-   - Returns responses in a format compatible with the mock AI service
-   - Implements proper error handling and status codes
-   - Handles concurrent requests efficiently
+## Requirement Coverage
 
-3. Implement the mock AI service response structures:
-   - Research and implement the correct response format for `mock_openai_vision_analysis`
-   - Research and implement the correct response format for `mock_openai_chat` (non-streaming)
-   - Ensure response formats match the OpenAI API specifications
-   - Include all required fields in the response (e.g., IDs, timestamps, tokens, etc.)
-   - Handle edge cases in the mock responses
+- Upload endpoint validates supported image content and size.
+- Non-streaming chat endpoint persists user and assistant messages.
+- LiveView chat streams assistant chunks without a separate SSE endpoint.
+- Conversations, labels, uploads, usage counters, and API logs are persisted in SQLite.
+- The UI includes conversation selection, upload management, settings cleanup, docs, memory, and activity panels.
+- Docker Compose starts the app without requiring a local Elixir toolchain.
+- CI runs formatting, unit/API tests, Credo, and Playwright E2E tests.
+- The release workflow builds and publishes a Docker image to GHCR for tagged releases.
 
-## Question 2: Improving User Experience - Streaming Responses
+## Trade-Offs
 
-**Context:**
-The delay in the chat endpoint can be long. We want to improve this by streaming the response back to the client as it becomes available.
+Mock responses are deterministic and tuned for the included kitchen/bathroom demo images. The app is structured so real model integration can replace `Inkit.VisualAssistant.MockAI`, but this submission does not require an API key or external AI service.
 
-**Requirements:**
-1. Implement a streaming endpoint that:
-   - Streams responses using Server-Sent Events (SSE)
-   - Handles connection drops and implements reconnection logic
-   - Implements proper backpressure handling
-   - Maintains compatibility with the mock AI service
-   - Handles concurrent streaming connections efficiently
-   - Implements proper error handling and status codes
+SQLite and local disk storage keep the project easy to run. That is appropriate for a take-home exercise, but production deployment would likely move image bytes to object storage and database storage to Postgres.
 
-2. Implement the streaming mock AI service:
-   - Research and implement the correct SSE event format
-   - Implement the streaming version of `mock_openai_chat`
-   - Ensure streaming events match the OpenAI API specifications
-   - Include all required event types (e.g., created, delta, completed)
-   - Handle streaming edge cases and errors
-   - Implement proper event sequencing and timing
+## AI and Process Disclosure
 
-## Question 3: Adding Context - History
+This project was built with OpenAI Codex using GPT-5.5 at high reasoning effort as a coding assistant. I used OpenSpec for spec-driven development: the Phoenix/Ash implementation was planned in `openspec/changes/add-visual-assistant-phoenix`, validated with OpenSpec, then implemented and tested against that checklist.
 
-**Context:**
-Currently, each chat interaction is independent. We want the assistant to remember the conversation history for a specific image.
+AI was used to accelerate scaffolding, implementation, test writing, UI iteration, and documentation. I made the architecture and trade-off decisions, reviewed the generated code, ran the verification suite, and adjusted behavior where the implementation did not meet the take-home requirements.
 
-**Requirements:**
-1. Implement conversation history that:
-   - Stores chat history for each image
-   - Handles concurrent access to history
-   - Implements proper error handling
-   - Maintains data consistency
-   - Handles history for both streaming and non-streaming responses
-   - Implements proper cleanup of old history
-
-2. Update mock functions to handle history:
-   - Modify mock functions to consider conversation context
-   - Implement proper history integration in responses
-   - Handle history-related edge cases
-   - Ensure history is properly reflected in both streaming and non-streaming responses
-
-## Question 4: Production Readiness - Persistent Storage
-
-**Context:**
-The current in-memory storage is not suitable for production. We need to implement a proper database solution.
-
-**Requirements:**
-1. Implement a database solution that:
-   - Uses a production-ready database
-   - Implements proper database migrations
-   - Handles concurrent database access
-   - Implements a caching layer
-   - Maintains data consistency
-   - Implements proper error handling
-   - Handles database connection issues
-   - Implements proper cleanup of old data
-
-2. Update mock functions for production:
-   - Ensure mock functions work with the database layer
-   - Implement proper error handling for database operations
-   - Handle database-related edge cases
-   - Ensure mock responses remain consistent with database state
-
-## Additional Requirements
-
-Throughout the implementation, consider:
-1. Security:
-   - Implement rate limiting
-   - Validate all inputs
-   - Handle file uploads securely
-   - Implement proper error handling
-   - Protect against common security vulnerabilities
-
-2. Performance:
-   - Handle concurrent requests efficiently
-   - Implement proper caching
-   - Optimize database queries
-   - Handle large files efficiently
-   - Implement proper resource cleanup
-
-3. Reliability:
-   - Handle errors gracefully
-   - Implement proper logging
-   - Handle edge cases
-   - Implement proper monitoring
-   - Handle system failures gracefully
-
-4. Scalability:
-   - Design for horizontal scaling
-   - Implement proper load balancing
-   - Handle increased load gracefully
-   - Implement proper resource management
-   - Design for future growth # inkit

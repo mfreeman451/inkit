@@ -1,0 +1,714 @@
+<main class="h-screen overflow-hidden bg-base-200 text-base-content">
+  <div class="grid h-screen grid-cols-1 overflow-hidden lg:grid-cols-[18rem_1fr] xl:grid-cols-[18rem_1fr_24rem]">
+    <aside class="hidden border-r border-base-300 bg-base-100 lg:flex lg:flex-col">
+      <div class="flex h-20 items-center gap-3 border-b border-base-300 px-6">
+        <div class="flex size-10 items-center justify-center rounded-md bg-neutral text-neutral-content">
+          <.icon name="hero-sparkles-solid" class="size-5" />
+        </div>
+        <div>
+          <div class="font-semibold tracking-tight">Visual Assistant</div>
+          <div class="text-xs text-base-content/50">Inkit take-home</div>
+        </div>
+      </div>
+
+      <div class="flex flex-1 flex-col gap-5 p-5">
+        <button class="btn btn-neutral btn-sm" phx-click="new_conversation" type="button">
+          <.icon name="hero-plus" class="size-4" /> New conversation
+        </button>
+
+        <nav class="menu rounded-box p-0 text-sm">
+          <li>
+            <button
+              class={
+                if @active_section == :conversations, do: "active bg-base-200 text-base-content"
+              }
+              phx-click="set_section"
+              phx-value-section="conversations"
+              type="button"
+            >
+              <.icon name="hero-chat-bubble-left-right" class="size-4" /> Conversations
+              <span class="badge badge-neutral badge-sm ml-auto">{length(@recent_images)}</span>
+            </button>
+          </li>
+          <li>
+            <button phx-click="set_section" phx-value-section="uploads" type="button">
+              <.icon name="hero-arrow-up-tray" class="size-4" /> Uploads
+            </button>
+          </li>
+          <li>
+            <button phx-click="set_section" phx-value-section="api_logs" type="button">
+              <.icon name="hero-clipboard-document-list" class="size-4" /> API Logs
+            </button>
+          </li>
+          <li>
+            <button phx-click="set_section" phx-value-section="settings" type="button">
+              <.icon name="hero-cog-6-tooth" class="size-4" /> Settings
+            </button>
+          </li>
+        </nav>
+
+        <div class="border-t border-base-300 pt-5">
+          <div class="mb-3 text-xs font-medium uppercase tracking-wide text-base-content/50">
+            Recent conversations
+          </div>
+          <div class="flex flex-col gap-1 text-sm">
+            <%= if @recent_images == [] do %>
+              <div class="rounded-md px-3 py-2 text-base-content/60">
+                No recent conversations.
+              </div>
+            <% else %>
+              <%= for image <- @recent_images do %>
+                <button
+                  class={[
+                    "text-left",
+                    "rounded-md px-3 py-2",
+                    if(@image && @image.id == image.id,
+                      do: "bg-neutral text-neutral-content",
+                      else: "text-base-content/70 hover:bg-base-200"
+                    )
+                  ]}
+                  phx-click="load_image"
+                  phx-value-image-id={image.public_id}
+                  type="button"
+                >
+                  <span class="block truncate">{image.label || image.original_filename}</span>
+                  <span class="block truncate text-[0.65rem] opacity-60">{image.public_id}</span>
+                </button>
+              <% end %>
+            <% end %>
+          </div>
+        </div>
+
+        <div class="mt-auto rounded-md border border-base-300 bg-base-100 p-4 text-xs">
+          <div class="mb-3 font-semibold">Usage this month</div>
+          <div class="mb-3">
+            <div class="mb-1 flex justify-between text-base-content/60">
+              <span>Image uploads</span><span>{@usage_summary.image_uploads} / 100</span>
+            </div>
+            <progress
+              class="progress progress-neutral h-1.5"
+              value={@usage_summary.image_uploads}
+              max="100"
+            >
+            </progress>
+          </div>
+          <div>
+            <div class="mb-1 flex justify-between text-base-content/60">
+              <span>API requests</span><span>{@usage_summary.api_requests} / 10,000</span>
+            </div>
+            <progress
+              class="progress progress-neutral h-1.5"
+              value={@usage_summary.api_requests}
+              max="10000"
+            >
+            </progress>
+          </div>
+        </div>
+      </div>
+
+      <div class="border-t border-base-300 px-5 py-4 text-xs text-base-content/60">
+        <span class="mr-2 inline-block size-2 rounded-full bg-success"></span>
+        All systems operational
+      </div>
+    </aside>
+
+    <section class="flex min-h-0 min-w-0 flex-col bg-base-100">
+      <header class="flex h-20 shrink-0 items-center justify-between border-b border-base-300 px-5">
+        <div class="min-w-0">
+          <div class="text-xs text-base-content/50">Conversation</div>
+          <h1 class="truncate text-xl font-semibold tracking-tight">
+            {page_title(@active_section, @conversation_view, @image)}
+          </h1>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="badge badge-success badge-outline hidden sm:inline-flex">Healthy</div>
+          <button
+            class="btn btn-ghost btn-sm"
+            phx-click="set_section"
+            phx-value-section="docs"
+            type="button"
+          >
+            <.icon name="hero-book-open" class="size-4" /> Docs
+          </button>
+        </div>
+      </header>
+
+      <nav class="flex shrink-0 gap-2 overflow-x-auto border-b border-base-300 px-4 py-3 text-sm lg:hidden">
+        <button
+          class="btn btn-sm"
+          phx-click="set_section"
+          phx-value-section="conversations"
+          type="button"
+        >
+          Conversations
+        </button>
+        <button
+          class="btn btn-sm"
+          phx-click="set_section"
+          phx-value-section="uploads"
+          type="button"
+        >
+          Uploads
+        </button>
+        <button
+          class="btn btn-sm"
+          phx-click="set_section"
+          phx-value-section="api_logs"
+          type="button"
+        >
+          API Logs
+        </button>
+        <button
+          class="btn btn-sm"
+          phx-click="set_section"
+          phx-value-section="settings"
+          type="button"
+        >
+          Settings
+        </button>
+      </nav>
+
+      <div
+        id="conversation-frame"
+        phx-hook="ConversationScroll"
+        class="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8"
+      >
+        <%= if @error do %>
+          <div class="alert alert-error mb-5">
+            <.icon name="hero-exclamation-triangle" class="size-5" />
+            <span>{@error}</span>
+          </div>
+        <% end %>
+
+        <%= if @active_section == :conversations do %>
+          <div class="mx-auto flex max-w-3xl flex-col gap-6">
+            <%= case @conversation_view do %>
+              <% :index -> %>
+                <div>
+                  <div class="mb-5 flex items-center justify-between gap-3">
+                    <div>
+                      <h2 class="text-lg font-semibold">Conversations</h2>
+                      <p class="text-sm text-base-content/60">
+                        Select a saved image conversation or start a new one.
+                      </p>
+                    </div>
+                    <button
+                      class="btn btn-neutral btn-sm"
+                      phx-click="new_conversation"
+                      type="button"
+                    >
+                      <.icon name="hero-plus" class="size-4" /> New
+                    </button>
+                  </div>
+                  <%= if @conversation_summaries == [] do %>
+                    <div class="rounded-md border border-dashed border-base-300 bg-base-200 p-8 text-center text-sm text-base-content/60">
+                      No recent conversations.
+                    </div>
+                  <% else %>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                      <%= for summary <- @conversation_summaries do %>
+                        <% image = summary.image %>
+                        <button
+                          class="rounded-md border border-base-300 bg-base-100 p-3 text-left hover:border-neutral"
+                          phx-click="load_image"
+                          phx-value-image-id={image.public_id}
+                          type="button"
+                        >
+                          <img
+                            src={~p"/images/#{image.public_id}"}
+                            alt={image.original_filename}
+                            class="mb-3 aspect-video w-full rounded-md object-cover"
+                            onerror="this.replaceWith(Object.assign(document.createElement('div'), {className: 'mb-3 flex aspect-video w-full items-center justify-center rounded-md bg-base-200 text-xs text-base-content/50', textContent: 'Image file unavailable'}))"
+                          />
+                          <div class="truncate text-sm font-medium">
+                            {image.label || image.original_filename}
+                          </div>
+                          <div class="mt-1 text-xs text-base-content/60">
+                            {summary.message_count} saved messages
+                          </div>
+                          <div class="mt-2 line-clamp-2 text-xs text-base-content/60">
+                            {summary.last_user_message || "No questions asked yet."}
+                          </div>
+                        </button>
+                      <% end %>
+                    </div>
+                  <% end %>
+                </div>
+              <% :new -> %>
+                <div class="rounded-md border border-dashed border-base-300 bg-base-200 p-8 text-center">
+                  <form
+                    id="image-upload-form"
+                    phx-change="validate_upload"
+                    phx-submit="upload"
+                    class="mx-auto flex max-w-sm flex-col gap-3"
+                  >
+                    <.live_file_input
+                      upload={@uploads.image}
+                      class="file-input file-input-bordered w-full"
+                    />
+                    <%= for entry <- @uploads.image.entries do %>
+                      <div
+                        data-testid="selected-image-preview"
+                        class="rounded-md border border-base-300 bg-base-100 p-3 text-left shadow-sm"
+                      >
+                        <.live_img_preview
+                          entry={entry}
+                          class="mb-3 aspect-video w-full rounded-md object-cover"
+                        />
+                        <div class="truncate text-sm font-medium">{entry.client_name}</div>
+                        <div class="text-xs text-base-content/60">
+                          {entry.client_type} · {file_size(entry.client_size)}
+                        </div>
+                      </div>
+                    <% end %>
+                    <button class="btn btn-neutral" type="submit">
+                      <.icon name="hero-arrow-up-tray" class="size-4" /> Upload image
+                    </button>
+                  </form>
+                </div>
+              <% :show -> %>
+                <div class="chat chat-end">
+                  <div class="chat-header mb-2">You</div>
+                  <div class="chat-bubble max-w-xl bg-base-200 text-base-content">
+                    <img
+                      src={~p"/images/#{@image.public_id}"}
+                      alt={@image.original_filename}
+                      class="mb-3 aspect-video w-full rounded-md object-cover"
+                    />
+                    <div class="text-xs text-base-content/60">
+                      <div>{@image.original_filename}</div>
+                      <div>{@image.content_type} · {file_size(@image.size)}</div>
+                    </div>
+                  </div>
+                </div>
+            <% end %>
+
+            <%= if @conversation_view == :show && @analysis do %>
+              <div class="chat chat-start">
+                <div class="chat-image avatar">
+                  <div class="flex size-9 items-center justify-center rounded-md bg-neutral text-neutral-content">
+                    <.icon name="hero-sparkles-solid" class="size-4" />
+                  </div>
+                </div>
+                <div class="chat-header mb-2">
+                  Visual Assistant
+                  <span class="ml-2 text-xs text-base-content/50">mock vision analysis</span>
+                </div>
+                <div class="chat-bubble chat-bubble-neutral max-w-xl whitespace-pre-line">
+                  {get_in(@analysis, ["choices", Access.at(0), "message", "content"])}
+                </div>
+              </div>
+            <% end %>
+
+            <%= for message <- if(@conversation_view == :show, do: @messages, else: []) do %>
+              <div class={["chat", if(message.role == "user", do: "chat-end", else: "chat-start")]}>
+                <div :if={message.role == "assistant"} class="chat-image avatar">
+                  <div class="flex size-9 items-center justify-center rounded-md bg-neutral text-neutral-content">
+                    <.icon name="hero-sparkles-solid" class="size-4" />
+                  </div>
+                </div>
+                <div class="chat-header mb-2">
+                  {if message.role == "user", do: "You", else: "Visual Assistant"}
+                </div>
+                <div class={[
+                  "chat-bubble max-w-xl whitespace-pre-line",
+                  if(message.role == "user",
+                    do: "chat-bubble-neutral",
+                    else: "bg-base-200 text-base-content"
+                  )
+                ]}>
+                  {message.content}
+                </div>
+              </div>
+            <% end %>
+
+            <%= if @conversation_view == :show && @streaming do %>
+              <div class="chat chat-start">
+                <div class="chat-image avatar">
+                  <div class="flex size-9 items-center justify-center rounded-md bg-neutral text-neutral-content">
+                    <.icon name="hero-sparkles-solid" class="size-4" />
+                  </div>
+                </div>
+                <div class="chat-header mb-2">Visual Assistant</div>
+                <div class="chat-bubble bg-base-200 text-base-content max-w-xl whitespace-pre-line">
+                  <%= if @streamed_response == "" do %>
+                    <span class="loading loading-dots loading-sm"></span>
+                  <% else %>
+                    {@streamed_response}
+                  <% end %>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <div class="mx-auto max-w-3xl">
+            <%= case @active_section do %>
+              <% :uploads -> %>
+                <div class="rounded-md border border-base-300 bg-base-100 p-6">
+                  <h2 class="mb-4 text-lg font-semibold">Uploads</h2>
+                  <%= if @recent_images == [] do %>
+                    <p class="text-sm text-base-content/60">No uploaded images yet.</p>
+                  <% else %>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                      <%= for image <- @recent_images do %>
+                        <div class="rounded-md border border-base-300 p-3">
+                          <button
+                            class="block w-full text-left"
+                            phx-click="load_image"
+                            phx-value-image-id={image.public_id}
+                            type="button"
+                          >
+                            <img
+                              src={~p"/images/#{image.public_id}"}
+                              alt={image.original_filename}
+                              class="mb-3 aspect-video w-full rounded-md object-cover"
+                              onerror="this.replaceWith(Object.assign(document.createElement('div'), {className: 'mb-3 flex aspect-video w-full items-center justify-center rounded-md bg-base-200 text-xs text-base-content/50', textContent: 'Image file unavailable'}))"
+                            />
+                            <div class="truncate text-sm font-medium">
+                              {image.label || image.original_filename}
+                            </div>
+                            <div class="text-xs text-base-content/60">
+                              {image.original_filename}
+                            </div>
+                          </button>
+                          <div class="mt-3 flex gap-2">
+                            <form phx-submit="update_label" class="flex min-w-0 flex-1 gap-2">
+                              <input type="hidden" name="image-id" value={image.public_id} />
+                              <input
+                                class="input input-bordered input-sm min-w-0 flex-1"
+                                name="label"
+                                value={image.label || ""}
+                                placeholder="Label"
+                              />
+                              <button class="btn btn-sm btn-outline" type="submit">Save</button>
+                            </form>
+                            <button
+                              class="btn btn-square btn-sm btn-ghost text-base-content/60 hover:bg-error/10 hover:text-error"
+                              aria-label={"Delete #{image.label || image.original_filename}"}
+                              data-confirm="Delete this image and its conversation history?"
+                              phx-click="delete_image"
+                              phx-value-image-id={image.public_id}
+                              title="Delete image"
+                              type="button"
+                            >
+                              <.icon name="hero-trash" class="size-4" />
+                            </button>
+                          </div>
+                        </div>
+                      <% end %>
+                    </div>
+                  <% end %>
+                </div>
+              <% :api_logs -> %>
+                <div class="rounded-md border border-base-300 bg-base-100 p-6">
+                  <div class="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                      <h2 class="text-lg font-semibold">API Logs</h2>
+                      <p class="text-sm text-base-content/60">
+                        {@api_log_total} recorded requests
+                      </p>
+                    </div>
+                    <div class="join">
+                      <button
+                        class="btn join-item btn-sm"
+                        disabled={@api_log_page <= 1}
+                        phx-click="api_logs_page"
+                        phx-value-direction="previous"
+                        type="button"
+                      >
+                        <.icon name="hero-chevron-left" class="size-4" />
+                      </button>
+                      <div class="join-item btn btn-sm no-animation">
+                        {@api_log_page} / {page_count(@api_log_total, @api_log_page_size)}
+                      </div>
+                      <button
+                        class="btn join-item btn-sm"
+                        disabled={@api_log_page >= page_count(@api_log_total, @api_log_page_size)}
+                        phx-click="api_logs_page"
+                        phx-value-direction="next"
+                        type="button"
+                      >
+                        <.icon name="hero-chevron-right" class="size-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <%= if @api_logs == [] do %>
+                    <p class="text-sm text-base-content/60">No API requests recorded yet.</p>
+                  <% else %>
+                    <div class="overflow-x-auto">
+                      <table class="table table-sm">
+                        <thead>
+                          <tr>
+                            <th>Method</th>
+                            <th>Path</th>
+                            <th>Status</th>
+                            <th>Duration</th>
+                            <th>Image</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <%= for log <- @api_logs do %>
+                            <tr>
+                              <td>{log.method}</td>
+                              <td>{log.path}</td>
+                              <td>{log.status}</td>
+                              <td>{log.duration_ms} ms</td>
+                              <td class="max-w-32 truncate">{log.image_public_id || "-"}</td>
+                            </tr>
+                          <% end %>
+                        </tbody>
+                      </table>
+                    </div>
+                  <% end %>
+                </div>
+              <% :settings -> %>
+                <div class="rounded-md border border-base-300 bg-base-100 p-6">
+                  <h2 class="mb-4 text-lg font-semibold">Settings</h2>
+                  <dl class="grid gap-3 text-sm sm:grid-cols-2">
+                    <dt class="text-base-content/60">Database</dt>
+                    <dd>SQLite via AshSqlite</dd>
+                    <dt class="text-base-content/60">Cache</dt>
+                    <dd>ETS</dd>
+                    <dt class="text-base-content/60">Stored images</dt>
+                    <dd>{length(@recent_images)}</dd>
+                    <dt class="text-base-content/60">Max upload</dt>
+                    <dd>16 MB</dd>
+                    <dt class="text-base-content/60">Theme</dt>
+                    <dd>Light</dd>
+                  </dl>
+                  <div class="mt-6 border-t border-base-300 pt-5">
+                    <h3 class="mb-2 font-semibold">Data management</h3>
+                    <p class="mb-3 text-sm text-base-content/60">
+                      Remove all uploaded files, labels, cached analysis, and saved conversations
+                      from the local SQLite database.
+                    </p>
+                    <button
+                      class="btn btn-outline btn-error"
+                      data-confirm="Clear every uploaded image and conversation?"
+                      disabled={@recent_images == []}
+                      phx-click="clear_all"
+                      type="button"
+                    >
+                      Clear images and conversations
+                    </button>
+                  </div>
+                </div>
+              <% :docs -> %>
+                <div class="rounded-md border border-base-300 bg-base-100 p-6">
+                  <h2 class="mb-4 text-lg font-semibold">Docs</h2>
+                  <p class="mb-5 text-sm text-base-content/60">
+                    The mock assistant is deterministic for the take-home demo. Ask questions in
+                    these patterns to exercise the programmed kitchen and bathroom responses.
+                  </p>
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="rounded-md border border-base-300 p-4">
+                      <h3 class="mb-3 font-semibold">Kitchen images</h3>
+                      <div class="flex flex-col gap-2 text-sm text-base-content/70">
+                        <div>What do you notice?</div>
+                        <div>What style is this kitchen?</div>
+                        <div>What materials are used for the cabinets and counters?</div>
+                        <div>What would you improve?</div>
+                      </div>
+                    </div>
+                    <div class="rounded-md border border-base-300 p-4">
+                      <h3 class="mb-3 font-semibold">Bathroom images</h3>
+                      <div class="flex flex-col gap-2 text-sm text-base-content/70">
+                        <div>What is going on in this bathroom?</div>
+                        <div>What style is this bathroom?</div>
+                        <div>What tile and fixtures are visible?</div>
+                        <div>What would you change?</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="mt-5 rounded-md bg-base-200 p-4 text-sm text-base-content/70">
+                    When a real OpenAI key is added later, these canned tags and answers should be
+                    replaced by model-generated image analysis and question routing.
+                  </div>
+                </div>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+
+      <footer
+        :if={@active_section == :conversations and @conversation_view == :show}
+        id="question-composer"
+        phx-hook="FocusQuestion"
+        class="shrink-0 border-t border-base-300 bg-base-100 px-4 py-4 sm:px-8"
+      >
+        <form phx-submit="ask" class="mx-auto flex max-w-3xl gap-2">
+          <input
+            class="input input-bordered flex-1"
+            type="text"
+            name="question"
+            value={@question}
+            placeholder="Ask about this image..."
+            disabled={is_nil(@image) or @streaming}
+          />
+          <button class="btn btn-neutral" type="submit" disabled={is_nil(@image) or @streaming}>
+            <.icon name="hero-paper-airplane-solid" class="size-4" />
+          </button>
+        </form>
+      </footer>
+    </section>
+
+    <aside class="hidden min-h-0 border-l border-base-300 bg-base-100 xl:flex xl:flex-col">
+      <div class="tabs tabs-border shrink-0 px-4 pt-4">
+        <button
+          class={["tab", if(@active_tab == :details, do: "tab-active")]}
+          phx-click="set_tab"
+          phx-value-tab="details"
+          type="button"
+        >
+          Details
+        </button>
+        <button
+          class={["tab", if(@active_tab == :memory, do: "tab-active")]}
+          phx-click="set_tab"
+          phx-value-tab="memory"
+          type="button"
+        >
+          Memory
+        </button>
+        <button
+          class={["tab", if(@active_tab == :activity, do: "tab-active")]}
+          phx-click="set_tab"
+          phx-value-tab="activity"
+          type="button"
+        >
+          Activity
+        </button>
+      </div>
+
+      <div class="flex flex-col gap-4 overflow-y-auto p-4">
+        <%= case @active_tab do %>
+          <% :details -> %>
+            <div class="card border border-base-300 bg-base-100">
+              <div class="card-body gap-4 p-4">
+                <h2 class="card-title text-base">Image details</h2>
+                <%= if @image do %>
+                  <div class="flex gap-3">
+                    <img
+                      src={~p"/images/#{@image.public_id}"}
+                      alt={@image.original_filename}
+                      class="size-20 rounded-md object-cover"
+                      onerror="this.replaceWith(Object.assign(document.createElement('div'), {className: 'flex size-20 items-center justify-center rounded-md bg-base-200 text-xs text-base-content/50', textContent: 'Missing'})"
+                    />
+                    <div class="min-w-0 text-sm">
+                      <div class="truncate font-medium">{@image.original_filename}</div>
+                      <div class="text-base-content/60">{@image.content_type}</div>
+                      <div class="text-base-content/60">{file_size(@image.size)}</div>
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <span
+                      :for={tag <- image_tags(@image)}
+                      class="badge badge-outline"
+                    >
+                      {tag}
+                    </span>
+                  </div>
+                <% else %>
+                  <div class="text-sm text-base-content/60">No uploaded image.</div>
+                <% end %>
+              </div>
+            </div>
+
+            <div class="card border border-base-300 bg-base-100">
+              <div class="card-body gap-3 p-4 text-sm">
+                <h2 class="card-title text-base">Request metrics</h2>
+                <dl class="grid grid-cols-2 gap-y-2">
+                  <dt class="text-base-content/60">Model</dt>
+                  <dd>mock-gpt-4o-mini</dd>
+                  <dt class="text-base-content/60">Messages</dt>
+                  <dd>{length(@messages)}</dd>
+                  <dt class="text-base-content/60">Streaming</dt>
+                  <dd>{if @streaming, do: "Active", else: "Idle"}</dd>
+                  <dt class="text-base-content/60">Cache</dt>
+                  <dd>ETS</dd>
+                </dl>
+              </div>
+            </div>
+          <% :memory -> %>
+            <div class="card border border-base-300 bg-base-100">
+              <div class="card-body gap-3 p-4">
+                <h2 class="card-title text-base">Conversation memory</h2>
+                <%= if @image do %>
+                  <div class="rounded-md bg-base-200 p-3 text-sm">
+                    <div class="mb-1 font-medium">Image context</div>
+                    <div class="text-base-content/70">
+                      {@image.label || @image.original_filename} · {file_size(@image.size)}
+                    </div>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                      <span :for={tag <- image_tags(@image)} class="badge badge-outline badge-sm">
+                        {tag}
+                      </span>
+                    </div>
+                  </div>
+                  <div :if={@analysis} class="rounded-md bg-base-200 p-3 text-sm">
+                    <div class="mb-1 font-medium">Initial analysis</div>
+                    <div class="whitespace-pre-line text-base-content/70">
+                      {get_in(@analysis, ["choices", Access.at(0), "message", "content"])}
+                    </div>
+                  </div>
+                  <%= if @messages == [] do %>
+                    <p class="text-sm text-base-content/60">No follow-up messages saved yet.</p>
+                  <% else %>
+                    <div class="flex flex-col gap-3">
+                      <%= for message <- @messages do %>
+                        <div class="rounded-md bg-base-200 p-3 text-sm">
+                          <div class="mb-1 font-medium capitalize">{message.role}</div>
+                          <div class="whitespace-pre-line text-base-content/70">
+                            {message.content}
+                          </div>
+                        </div>
+                      <% end %>
+                    </div>
+                  <% end %>
+                <% else %>
+                  <p class="text-sm text-base-content/60">
+                    Select a conversation to view memory.
+                  </p>
+                <% end %>
+              </div>
+            </div>
+          <% :activity -> %>
+            <div class="card border border-base-300 bg-base-100">
+              <div class="card-body gap-3 p-4">
+                <h2 class="card-title text-base">Activity</h2>
+                <%= if @image do %>
+                  <div class="rounded-md bg-base-200 p-3 text-sm">
+                    <div class="font-medium">Uploaded</div>
+                    <div class="text-base-content/60">{@image.inserted_at}</div>
+                  </div>
+                  <div class="flex flex-col gap-3 text-sm">
+                    <%= for log <- @image_activity_logs do %>
+                      <div class="rounded-md bg-base-200 p-3">
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="font-medium">{log.method} {log.path}</span>
+                          <span class="badge badge-outline badge-sm">{log.status}</span>
+                        </div>
+                        <div class="text-base-content/60">
+                          {log.duration_ms} ms · {log.inserted_at}
+                        </div>
+                      </div>
+                    <% end %>
+                    <div
+                      :if={@image_activity_logs == []}
+                      class="text-base-content/60"
+                    >
+                      No API log rows recorded for this image yet.
+                    </div>
+                  </div>
+                <% else %>
+                  <p class="text-sm text-base-content/60">
+                    Select a conversation to view activity.
+                  </p>
+                <% end %>
+              </div>
+            </div>
+        <% end %>
+      </div>
+    </aside>
+  </div>
+</main>
